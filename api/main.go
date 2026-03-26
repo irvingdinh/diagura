@@ -1,7 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"localhost/app/core/container"
+)
 
 func main() {
-	fmt.Println("Hello, world!")
+	container.Run()
 }
