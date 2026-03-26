@@ -163,6 +163,8 @@ func (b *SelectBuilder) Build() (string, []any) {
 
 	if b.limit >= 0 {
 		fmt.Fprintf(&buf, " LIMIT %d", b.limit)
+	} else if b.offset >= 0 {
+		buf.WriteString(" LIMIT -1")
 	}
 	if b.offset >= 0 {
 		fmt.Fprintf(&buf, " OFFSET %d", b.offset)
@@ -321,9 +323,22 @@ func (b *DeleteBuilder) Build() (string, []any) {
 // ---------------------------------------------------------------------------
 
 // EscapeLike escapes special characters in a LIKE pattern.
+// The caller must include ESCAPE '\' in the SQL clause for the
+// escaping to take effect. Prefer LikeCondition for a safer API.
 func EscapeLike(s string) string {
 	s = strings.ReplaceAll(s, "\\", "\\\\")
 	s = strings.ReplaceAll(s, "%", "\\%")
 	s = strings.ReplaceAll(s, "_", "\\_")
 	return s
+}
+
+// LikeCondition returns a WHERE condition with the proper ESCAPE clause
+// and the escaped pattern for use as a bind parameter.
+//
+// Usage:
+//
+//	cond, pattern := orm.LikeCondition("name", userInput)
+//	builder.Where(cond, "%"+pattern+"%")
+func LikeCondition(column, pattern string) (cond string, escapedPattern string) {
+	return fmt.Sprintf("%s LIKE ? ESCAPE '\\'", column), EscapeLike(pattern)
 }

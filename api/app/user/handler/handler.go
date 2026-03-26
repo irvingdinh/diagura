@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	nethttp "net/http"
+	"strconv"
 	"time"
 
 	"localhost/app/core/sqlite"
@@ -18,11 +19,20 @@ func NewHandler(db *sqlite.DB) *Handler {
 	return &Handler{db: db}
 }
 
-func (h *Handler) List(w nethttp.ResponseWriter, _ *nethttp.Request) {
-	query, args := orm.Select("id", "email", "name", "created_at", "updated_at").
+func (h *Handler) List(w nethttp.ResponseWriter, r *nethttp.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+
+	b := orm.Select("id", "email", "name", "created_at", "updated_at").
 		From("users").
-		OrderBy("created_at", "DESC").
-		Build()
+		OrderBy("created_at", "DESC")
+	if limit > 0 {
+		b = b.Limit(limit)
+	}
+	if offset > 0 {
+		b = b.Offset(offset)
+	}
+	query, args := b.Build()
 
 	users, err := orm.QueryAll[entity.User](h.db, query, args...)
 	if err != nil {

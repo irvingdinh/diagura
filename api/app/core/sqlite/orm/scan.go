@@ -31,9 +31,14 @@ func QueryAll[T any](q Querier, sql string, args ...any) ([]T, error) {
 	}
 	m := getMapping(t)
 
+	dests := make([]any, len(columns))
+	for i := range dests {
+		dests[i] = new(any)
+	}
+
 	var result []T
 	for rows.Next() {
-		item, err := scanRow[T](rows, columns, m)
+		item, err := scanRow[T](rows, columns, m, dests)
 		if err != nil {
 			return nil, err
 		}
@@ -51,14 +56,14 @@ func QueryAll[T any](q Querier, sql string, args ...any) ([]T, error) {
 // QueryOne executes a query and scans exactly one row into T.
 // Returns ErrNotFound if no rows match.
 func QueryOne[T any](q Querier, sql string, args ...any) (T, error) {
+	var zero T
+
 	rows, err := q.Query(sql, args...)
 	if err != nil {
-		var zero T
 		return zero, err
 	}
 	defer func() { _ = rows.Close() }()
 
-	var zero T
 	columns := rows.Columns()
 	t := reflect.TypeOf(zero)
 	if t.Kind() == reflect.Ptr {
@@ -73,20 +78,24 @@ func QueryOne[T any](q Querier, sql string, args ...any) (T, error) {
 		return zero, ErrNotFound
 	}
 
-	return scanRow[T](rows, columns, m)
+	dests := make([]any, len(columns))
+	for i := range dests {
+		dests[i] = new(any)
+	}
+	return scanRow[T](rows, columns, m, dests)
 }
 
 // QueryVal executes a query and scans a single scalar value from the first
 // row. Returns ErrNotFound if no rows match.
 func QueryVal[T any](q Querier, sql string, args ...any) (T, error) {
+	var zero T
+
 	rows, err := q.Query(sql, args...)
 	if err != nil {
-		var zero T
 		return zero, err
 	}
 	defer func() { _ = rows.Close() }()
 
-	var zero T
 	if !rows.Next() {
 		if err := rows.Err(); err != nil {
 			return zero, err
@@ -153,14 +162,9 @@ func buildMapping(t reflect.Type, prefix []int, m *fieldMapping) {
 // Row scanning
 // ---------------------------------------------------------------------------
 
-func scanRow[T any](rows *sqlite.Rows, columns []string, m *fieldMapping) (T, error) {
+func scanRow[T any](rows *sqlite.Rows, columns []string, m *fieldMapping, dests []any) (T, error) {
 	var item T
 	v := reflect.ValueOf(&item).Elem()
-
-	dests := make([]any, len(columns))
-	for i := range dests {
-		dests[i] = new(any)
-	}
 
 	if err := rows.Scan(dests...); err != nil {
 		return item, fmt.Errorf("orm: scan: %w", err)

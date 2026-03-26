@@ -30,7 +30,8 @@ func NewBaseModel() BaseModel {
 }
 
 // NewID generates a unique, time-sortable 20-character alphanumeric
-// identifier. Format: 8 chars timestamp (base32) + 12 chars random.
+// identifier. Format: 8 chars timestamp (base32, 40-bit) + 12 chars random.
+// The timestamp component wraps every ~34.8 years; see generateID.
 func NewID() string {
 	return generateID(time.Now())
 }
@@ -39,6 +40,11 @@ const alphabet = "0123456789abcdefghjkmnpqrstvwxyz"
 
 var idCounter atomic.Uint64
 
+// generateID produces a 20-character ID: 8 base32 chars for the timestamp
+// (lower 40 bits of millisecond precision) + 12 base32 chars of randomness.
+// The 40-bit timestamp wraps every ~34.8 years. Since current Unix
+// milliseconds exceed 40 bits, the upper bits are truncated. IDs remain
+// time-sortable within any ~34.8-year window (next wrap ~2039).
 func generateID(now time.Time) string {
 	var buf [20]byte
 

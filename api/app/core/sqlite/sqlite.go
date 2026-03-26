@@ -22,18 +22,62 @@ import (
 // ErrNoRows is returned when a query returns no rows.
 var ErrNoRows = errors.New("sqlite: no rows")
 
+// ErrTxFinished is returned when Rows from a transaction are used after
+// Commit or Rollback.
+var ErrTxFinished = errors.New("sqlite: transaction already finished")
+
 // Result holds the outcome of an Exec call.
 type Result struct {
 	LastInsertID int64
 	RowsAffected int64
 }
 
+// cachedConn wraps a driver.Conn with a prepared statement cache.
+type cachedConn struct {
+	conn  *driver.Conn
+	cache map[string]*driver.Stmt
+}
+
+func newCachedConn(conn *driver.Conn) *cachedConn {
+	return &cachedConn{conn: conn, cache: make(map[string]*driver.Stmt)}
+}
+
+// prepare returns a cached statement or prepares a new one.
+func (cc *cachedConn) prepare(sql string) (*driver.Stmt, error) {
+	if stmt, ok := cc.cache[sql]; ok {
+		if err := stmt.Reset(); err == nil {
+			if err := stmt.ClearBindings(); err == nil {
+				return stmt, nil
+			}
+		}
+		// Reset or ClearBindings failed; discard and re-prepare.
+		delete(cc.cache, sql)
+		_ = stmt.Finalize()
+	}
+
+	stmt, err := cc.conn.Prepare(sql)
+	if err != nil {
+		return nil, err
+	}
+	cc.cache[sql] = stmt
+	return stmt, nil
+}
+
+// close finalizes all cached statements and closes the connection.
+func (cc *cachedConn) close() error {
+	for _, stmt := range cc.cache {
+		_ = stmt.Finalize()
+	}
+	cc.cache = nil
+	return cc.conn.Close()
+}
+
 // DB is the primary database handle. Write operations use a single
 // mutex-protected connection. Read operations use a pool of connections.
 type DB struct {
 	mu           sync.Mutex
-	write        *driver.Conn
-	readPool     chan *driver.Conn
+	write        *cachedConn
+	readPool     chan *cachedConn
 	poolDone     chan struct{}
 	poolWg       sync.WaitGroup
 	poolStopping atomic.Bool
@@ -84,7 +128,7 @@ func Provide(migrationFS fs.FS) fx.Option {
 
 func (db *DB) open(ctx context.Context) error {
 	// Open write connection.
-	writeConn, err := db.openConn()
+	writeConn, err := db.openConn(driver.OpenReadWrite | driver.OpenCreate | driver.OpenNoMutex)
 	if err != nil {
 		return err
 	}
@@ -95,37 +139,35 @@ func (db *DB) open(ctx context.Context) error {
 		return fmt.Errorf("sqlite: wal_autocheckpoint: %w", err)
 	}
 
-	db.write = writeConn
-
-	// Run migrations on the write connection before opening the read pool.
+	// Run migrations on the raw write connection before wrapping.
 	if db.migrationFS != nil {
 		engine := migration.NewEngine(writeConn)
 		if err := engine.Collect(db.migrationFS); err != nil {
-			_ = db.write.Close()
-			db.write = nil
+			_ = writeConn.Close()
 			return fmt.Errorf("sqlite: collect migrations: %w", err)
 		}
 		if _, err := engine.Up(ctx); err != nil {
-			_ = db.write.Close()
-			db.write = nil
+			_ = writeConn.Close()
 			return err
 		}
 	}
 
+	db.write = newCachedConn(writeConn)
+
 	// Open read pool.
-	pool := make(chan *driver.Conn, db.readPoolSize)
+	pool := make(chan *cachedConn, db.readPoolSize)
 	for range db.readPoolSize {
-		rc, err := db.openConn()
+		rc, err := db.openConn(driver.OpenReadOnly | driver.OpenNoMutex)
 		if err != nil {
 			close(pool)
 			for conn := range pool {
-				_ = conn.Close()
+				_ = conn.close()
 			}
-			_ = db.write.Close()
+			_ = db.write.close()
 			db.write = nil
 			return fmt.Errorf("sqlite: open read connection: %w", err)
 		}
-		pool <- rc
+		pool <- newCachedConn(rc)
 	}
 	db.readPool = pool
 	db.poolDone = make(chan struct{})
@@ -133,8 +175,8 @@ func (db *DB) open(ctx context.Context) error {
 	return nil
 }
 
-func (db *DB) openConn() (*driver.Conn, error) {
-	conn, err := driver.Open(db.path, driver.OpenReadWrite|driver.OpenCreate|driver.OpenNoMutex)
+func (db *DB) openConn(flags int) (*driver.Conn, error) {
+	conn, err := driver.Open(db.path, flags)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +213,7 @@ func (db *DB) Close() error {
 
 		close(db.readPool)
 		for conn := range db.readPool {
-			_ = conn.Close()
+			_ = conn.close()
 		}
 		db.readPool = nil
 	}
@@ -183,7 +225,7 @@ func (db *DB) Close() error {
 		return nil
 	}
 
-	err := db.write.Close()
+	err := db.write.close()
 	db.write = nil
 	return err
 }
@@ -203,11 +245,10 @@ func (db *DB) Exec(sql string, args ...any) (Result, error) {
 		return Result{}, fmt.Errorf("sqlite: database not open")
 	}
 
-	stmt, err := db.write.Prepare(sql)
+	stmt, err := db.write.prepare(sql)
 	if err != nil {
 		return Result{}, err
 	}
-	defer func() { _ = stmt.Finalize() }()
 
 	if err := stmt.Bind(args...); err != nil {
 		return Result{}, err
@@ -218,8 +259,8 @@ func (db *DB) Exec(sql string, args ...any) (Result, error) {
 	}
 
 	return Result{
-		LastInsertID: db.write.LastInsertRowID(),
-		RowsAffected: db.write.Changes(),
+		LastInsertID: db.write.conn.LastInsertRowID(),
+		RowsAffected: db.write.conn.Changes(),
 	}, nil
 }
 
@@ -235,7 +276,7 @@ func (db *DB) Query(sql string, args ...any) (*Rows, error) {
 func (db *DB) queryPool(sql string, args []any) (*Rows, error) {
 	db.poolWg.Add(1)
 
-	var conn *driver.Conn
+	var conn *cachedConn
 	select {
 	case conn = <-db.readPool:
 	default:
@@ -247,14 +288,13 @@ func (db *DB) queryPool(sql string, args []any) (*Rows, error) {
 		}
 	}
 
-	stmt, err := conn.Prepare(sql)
+	stmt, err := conn.prepare(sql)
 	if err != nil {
 		db.returnToPool(conn)
 		return nil, err
 	}
 
 	if err := stmt.Bind(args...); err != nil {
-		_ = stmt.Finalize()
 		db.returnToPool(conn)
 		return nil, err
 	}
@@ -275,14 +315,13 @@ func (db *DB) queryMu(sql string, args []any) (*Rows, error) {
 		return nil, fmt.Errorf("sqlite: database not open")
 	}
 
-	stmt, err := db.write.Prepare(sql)
+	stmt, err := db.write.prepare(sql)
 	if err != nil {
 		db.mu.Unlock()
 		return nil, err
 	}
 
 	if err := stmt.Bind(args...); err != nil {
-		_ = stmt.Finalize()
 		db.mu.Unlock()
 		return nil, err
 	}
@@ -295,14 +334,14 @@ func (db *DB) queryMu(sql string, args []any) (*Rows, error) {
 	}, nil
 }
 
-func (db *DB) returnToPool(conn *driver.Conn) {
+func (db *DB) returnToPool(conn *cachedConn) {
 	if db.poolStopping.Load() {
-		_ = conn.Close()
+		_ = conn.close()
 	} else {
 		select {
 		case db.readPool <- conn:
 		case <-db.poolDone:
-			_ = conn.Close()
+			_ = conn.close()
 		}
 	}
 	db.poolWg.Done()
@@ -327,17 +366,15 @@ func (db *DB) Begin() (*Tx, error) {
 		return nil, fmt.Errorf("sqlite: database not open")
 	}
 
-	stmt, err := db.write.Prepare("BEGIN IMMEDIATE")
+	stmt, err := db.write.prepare("BEGIN IMMEDIATE")
 	if err != nil {
 		db.mu.Unlock()
 		return nil, fmt.Errorf("sqlite: begin: %w", err)
 	}
 	if _, err := stmt.Step(); err != nil {
-		_ = stmt.Finalize()
 		db.mu.Unlock()
 		return nil, fmt.Errorf("sqlite: begin: %w", err)
 	}
-	_ = stmt.Finalize()
 
 	return &Tx{db: db}, nil
 }
@@ -367,20 +404,25 @@ func (db *DB) InTx(fn func(*Tx) error) error {
 
 // Rows iterates over query results.
 type Rows struct {
-	db     *DB
-	conn   *driver.Conn      // read pool connection (nil if mutex-held)
-	pool   chan *driver.Conn // pool to return conn to (nil if mutex-held)
-	mu     *sync.Mutex       // mutex to unlock on Close (nil if pooled)
-	stmt   *driver.Stmt
-	cols   []string
-	err    error
-	closed bool
-	hasRow bool
+	db         *DB
+	conn       *cachedConn      // read pool connection (nil if mutex-held)
+	pool       chan *cachedConn // pool to return conn to (nil if mutex-held)
+	mu         *sync.Mutex      // mutex to unlock on Close (nil if pooled)
+	stmt       *driver.Stmt
+	txFinished *bool // non-nil for Tx-originated Rows; points to Tx.finished
+	cols       []string
+	err        error
+	closed     bool
+	hasRow     bool
 }
 
 // Next advances to the next row.
 func (r *Rows) Next() bool {
 	if r.closed {
+		return false
+	}
+	if r.txFinished != nil && *r.txFinished {
+		r.err = ErrTxFinished
 		return false
 	}
 	hasRow, err := r.stmt.Step()
@@ -396,6 +438,9 @@ func (r *Rows) Next() bool {
 // Supported types: *int, *int32, *int64, *float32, *float64,
 // *string, *[]byte, *bool, *any.
 func (r *Rows) Scan(dest ...any) error {
+	if r.txFinished != nil && *r.txFinished {
+		return ErrTxFinished
+	}
 	if !r.hasRow {
 		return fmt.Errorf("sqlite: scan: no row")
 	}
@@ -473,7 +518,7 @@ func (r *Rows) Close() error {
 		return nil
 	}
 	r.closed = true
-	_ = r.stmt.Finalize()
+	_ = r.stmt.Reset()
 	if r.pool != nil {
 		r.db.returnToPool(r.conn)
 	} else if r.mu != nil {
@@ -544,12 +589,10 @@ func (tx *Tx) Exec(sql string, args ...any) (Result, error) {
 		return Result{}, fmt.Errorf("sqlite: transaction already finished")
 	}
 
-	conn := tx.db.write
-	stmt, err := conn.Prepare(sql)
+	stmt, err := tx.db.write.prepare(sql)
 	if err != nil {
 		return Result{}, err
 	}
-	defer func() { _ = stmt.Finalize() }()
 
 	if err := stmt.Bind(args...); err != nil {
 		return Result{}, err
@@ -560,8 +603,8 @@ func (tx *Tx) Exec(sql string, args ...any) (Result, error) {
 	}
 
 	return Result{
-		LastInsertID: conn.LastInsertRowID(),
-		RowsAffected: conn.Changes(),
+		LastInsertID: tx.db.write.conn.LastInsertRowID(),
+		RowsAffected: tx.db.write.conn.Changes(),
 	}, nil
 }
 
@@ -571,20 +614,19 @@ func (tx *Tx) Query(sql string, args ...any) (*Rows, error) {
 		return nil, fmt.Errorf("sqlite: transaction already finished")
 	}
 
-	conn := tx.db.write
-	stmt, err := conn.Prepare(sql)
+	stmt, err := tx.db.write.prepare(sql)
 	if err != nil {
 		return nil, err
 	}
 
 	if err := stmt.Bind(args...); err != nil {
-		_ = stmt.Finalize()
 		return nil, err
 	}
 
 	return &Rows{
-		db:   tx.db,
-		stmt: stmt,
+		db:         tx.db,
+		stmt:       stmt,
+		txFinished: &tx.finished,
 	}, nil
 }
 
@@ -599,11 +641,10 @@ func (tx *Tx) QueryRow(sql string, args ...any) *Row {
 }
 
 func (tx *Tx) execLocked(sql string) error {
-	stmt, err := tx.db.write.Prepare(sql)
+	stmt, err := tx.db.write.prepare(sql)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = stmt.Finalize() }()
 	_, err = stmt.Step()
 	return err
 }
