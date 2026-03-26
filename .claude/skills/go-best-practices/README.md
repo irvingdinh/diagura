@@ -7,8 +7,6 @@ A structured repository for creating and maintaining Go Best Practices optimized
 - `rules/` - Individual rule files (one per rule)
   - `_sections.md` - Section metadata (titles, impacts, descriptions)
   - `_template.md` - Template for creating new rules
-  - `area-description.md` - Individual rule files
-- __`AGENTS.md`__ - Compiled output (generated)
 - __`SKILL.md`__ - Skill manifest for Claude Code
 
 ## Creating a New Rule

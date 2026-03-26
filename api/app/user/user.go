@@ -21,6 +21,7 @@ func moduleImpl(h *handler.Handler) *Module {
 
 func (m *Module) RegisterRoutes(mux *nethttp.ServeMux) {
 	mux.HandleFunc("GET /api/users", m.handler.List)
+	mux.HandleFunc("POST /api/users", m.handler.Create)
 }
 
 func Provide() fx.Option {
