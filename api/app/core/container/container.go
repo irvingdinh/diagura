@@ -4,14 +4,18 @@ import (
 	"go.uber.org/fx"
 
 	"localhost/app/core/config"
+	"localhost/app/core/http"
 )
 
-func Run() {
+func Run(opts ...fx.Option) {
 	config.Load()
 
-	fx.New(
-		fx.Invoke(func() {
+	core := fx.Options(
+		fx.Provide(http.NewServer),
+		fx.Invoke(func(_ http.Server) {
 			config.Validate()
 		}),
-	).Run()
+	)
+
+	fx.New(core, fx.Options(opts...)).Run()
 }
