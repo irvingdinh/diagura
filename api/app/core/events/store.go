@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"math"
 
 	"localhost/app/core/sqlite"
 	"localhost/app/core/sqlite/orm"
@@ -160,9 +159,4 @@ func (s *Store) AvailableNames(ctx context.Context) ([]string, error) {
 		names[i] = r.Name
 	}
 	return names, nil
-}
-
-// TotalPages computes the number of pages for a given total and per-page size.
-func TotalPages(total, perPage int) int {
-	return int(math.Ceil(float64(total) / float64(perPage)))
 }

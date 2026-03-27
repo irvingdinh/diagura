@@ -7,6 +7,7 @@ import (
 	nethttp "net/http"
 
 	profileservice "localhost/app/admin/profile/service"
+	authevent "localhost/app/auth/event"
 	authservice "localhost/app/auth/service"
 	"localhost/app/core/events"
 	"localhost/app/core/http"
@@ -127,6 +128,10 @@ func (h *Handler) LogoutOtherSessions(w nethttp.ResponseWriter, r *nethttp.Reque
 		http.WriteError(w, nethttp.StatusInternalServerError, "Internal server error")
 		return
 	}
+
+	h.bus.Emit(r.Context(), authevent.SessionInvalidatedAll{
+		UserID: user.ID,
+	})
 
 	w.WriteHeader(nethttp.StatusNoContent)
 }
