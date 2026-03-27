@@ -24,7 +24,7 @@ type Module struct {
 	mw        *middleware.Middleware
 }
 
-func moduleImpl(h *handler.Handler, p *profile.Module, um *usermgmt.Module, lm *logmgmt.Module, em *eventmgmt.Module, mw *middleware.Middleware) *Module {
+func newModule(h *handler.Handler, p *profile.Module, um *usermgmt.Module, lm *logmgmt.Module, em *eventmgmt.Module, mw *middleware.Middleware) *Module {
 	return &Module{
 		handler:   h,
 		profile:   p,
@@ -52,7 +52,7 @@ func Provide() fx.Option {
 		eventmgmt.Provide(),
 		fx.Provide(handler.NewHandler),
 		fx.Provide(
-			fx.Annotate(moduleImpl, fx.As(new(http.RouteRegistrar)), fx.ResultTags(`group:"routes"`)),
+			fx.Annotate(newModule, fx.As(new(http.RouteRegistrar)), fx.ResultTags(`group:"routes"`)),
 		),
 	)
 }
