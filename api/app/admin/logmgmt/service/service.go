@@ -117,8 +117,8 @@ func (s *Service) ListEntries(_ context.Context, filter ListFilter) (*ListResult
 		}
 
 		if filter.Level != "" {
-			entryLevel, _ := entry["level"].(string)
-			if !meetsMinLevel(entryLevel, filter.Level) {
+			entryLevel, ok := entry["level"].(string)
+			if ok && !meetsMinLevel(entryLevel, filter.Level) {
 				continue
 			}
 		}
