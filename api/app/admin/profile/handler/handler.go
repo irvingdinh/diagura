@@ -8,7 +8,9 @@ import (
 
 	profileservice "localhost/app/admin/profile/service"
 	authservice "localhost/app/auth/service"
+	"localhost/app/core/events"
 	"localhost/app/core/http"
+	userevent "localhost/app/user/event"
 	userservice "localhost/app/user/service"
 )
 
@@ -16,11 +18,12 @@ import (
 type Handler struct {
 	svc     *profileservice.Service
 	userSvc *userservice.Service
+	bus     *events.Bus
 }
 
 // NewHandler creates a Handler with the given dependencies.
-func NewHandler(svc *profileservice.Service, userSvc *userservice.Service) *Handler {
-	return &Handler{svc: svc, userSvc: userSvc}
+func NewHandler(svc *profileservice.Service, userSvc *userservice.Service, bus *events.Bus) *Handler {
+	return &Handler{svc: svc, userSvc: userSvc, bus: bus}
 }
 
 // Get returns the authenticated user's profile.
@@ -60,6 +63,11 @@ func (h *Handler) Update(w nethttp.ResponseWriter, r *nethttp.Request) {
 		http.WriteError(w, nethttp.StatusInternalServerError, "Internal server error")
 		return
 	}
+
+	h.bus.Emit(r.Context(), userevent.UserUpdated{
+		UserID:  user.ID,
+		Changes: map[string]any{"name": input.Name},
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
@@ -101,6 +109,10 @@ func (h *Handler) ChangePassword(w nethttp.ResponseWriter, r *nethttp.Request) {
 		http.WriteError(w, nethttp.StatusInternalServerError, "Internal server error")
 		return
 	}
+
+	h.bus.Emit(r.Context(), userevent.UserPasswordChanged{
+		UserID: user.ID,
+	})
 
 	w.WriteHeader(nethttp.StatusNoContent)
 }

@@ -1,4 +1,5 @@
 import {
+  Activity,
   ChevronsUpDown,
   LayoutDashboard,
   LogOut,
@@ -47,6 +48,7 @@ const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/admin" },
   { label: "Users", icon: Users, href: "/admin/users" },
   { label: "Logs", icon: ScrollText, href: "/admin/logs" },
+  { label: "Events", icon: Activity, href: "/admin/events" },
 ];
 
 export const AppSidebar = ({

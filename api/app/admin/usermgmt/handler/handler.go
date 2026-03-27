@@ -9,7 +9,9 @@ import (
 
 	usermgmtservice "localhost/app/admin/usermgmt/service"
 	authservice "localhost/app/auth/service"
+	"localhost/app/core/events"
 	"localhost/app/core/http"
+	userevent "localhost/app/user/event"
 	userservice "localhost/app/user/service"
 )
 
@@ -17,11 +19,12 @@ import (
 type Handler struct {
 	svc     *usermgmtservice.Service
 	userSvc *userservice.Service
+	bus     *events.Bus
 }
 
 // NewHandler creates a Handler with the given dependencies.
-func NewHandler(svc *usermgmtservice.Service, userSvc *userservice.Service) *Handler {
-	return &Handler{svc: svc, userSvc: userSvc}
+func NewHandler(svc *usermgmtservice.Service, userSvc *userservice.Service, bus *events.Bus) *Handler {
+	return &Handler{svc: svc, userSvc: userSvc, bus: bus}
 }
 
 // canManageRole checks whether the acting user can manage users with the given role slug.
@@ -137,6 +140,13 @@ func (h *Handler) Create(w nethttp.ResponseWriter, r *nethttp.Request) {
 		return
 	}
 
+	h.bus.Emit(r.Context(), userevent.UserCreated{
+		UserID: result.ID,
+		Email:  result.Email,
+		Name:   result.Name,
+		Role:   input.Role,
+	})
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(nethttp.StatusCreated)
 	_ = json.NewEncoder(w).Encode(map[string]any{
@@ -251,6 +261,21 @@ func (h *Handler) Update(w nethttp.ResponseWriter, r *nethttp.Request) {
 		return
 	}
 
+	changes := make(map[string]any)
+	if input.Name != nil {
+		changes["name"] = *input.Name
+	}
+	if input.Email != nil {
+		changes["email"] = *input.Email
+	}
+	if input.Role != nil {
+		changes["role"] = *input.Role
+	}
+	h.bus.Emit(r.Context(), userevent.UserUpdated{
+		UserID:  id,
+		Changes: changes,
+	})
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{"data": updated})
 }
@@ -300,6 +325,11 @@ func (h *Handler) SetPassword(w nethttp.ResponseWriter, r *nethttp.Request) {
 		slog.ErrorContext(r.Context(), "failed to invalidate sessions", "error", err)
 	}
 
+	h.bus.Emit(r.Context(), userevent.UserPasswordSet{
+		UserID: id,
+		SetBy:  actor.ID,
+	})
+
 	w.WriteHeader(nethttp.StatusNoContent)
 }
 
@@ -339,6 +369,11 @@ func (h *Handler) Delete(w nethttp.ResponseWriter, r *nethttp.Request) {
 		slog.ErrorContext(r.Context(), "failed to invalidate sessions", "error", err)
 	}
 
+	h.bus.Emit(r.Context(), userevent.UserDeleted{
+		UserID: id,
+		Email:  target.Email,
+	})
+
 	w.WriteHeader(nethttp.StatusNoContent)
 }
 
@@ -368,6 +403,11 @@ func (h *Handler) Restore(w nethttp.ResponseWriter, r *nethttp.Request) {
 		http.WriteError(w, nethttp.StatusInternalServerError, "Internal server error")
 		return
 	}
+
+	h.bus.Emit(r.Context(), userevent.UserRestored{
+		UserID: id,
+		Email:  target.Email,
+	})
 
 	w.WriteHeader(nethttp.StatusNoContent)
 }

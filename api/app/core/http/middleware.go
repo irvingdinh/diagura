@@ -2,7 +2,9 @@ package http
 
 import (
 	"log/slog"
+	"net"
 	nethttp "net/http"
+	"strings"
 	"time"
 
 	"localhost/app/core/log"
@@ -39,6 +41,7 @@ func RequestLogger(next nethttp.Handler) nethttp.Handler {
 	return nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
 		requestID := utils.NewID()
 		ctx := log.WithRequestID(r.Context(), requestID)
+		ctx = log.WithIP(ctx, ClientIP(r))
 		r = r.WithContext(ctx)
 
 		w.Header().Set("X-Request-ID", requestID)
@@ -55,4 +58,23 @@ func RequestLogger(next nethttp.Handler) nethttp.Handler {
 			"duration_ms", time.Since(start).Milliseconds(),
 		)
 	})
+}
+
+// ClientIP extracts the client IP address from the request, checking
+// X-Forwarded-For and X-Real-IP headers before falling back to RemoteAddr.
+func ClientIP(r *nethttp.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if i := strings.Index(xff, ","); i > 0 {
+			return strings.TrimSpace(xff[:i])
+		}
+		return strings.TrimSpace(xff)
+	}
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }

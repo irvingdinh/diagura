@@ -7,6 +7,7 @@ type ctxKey int
 const (
 	ctxKeyRequestID ctxKey = iota
 	ctxKeyUserID
+	ctxKeyIP
 )
 
 // WithRequestID returns a copy of ctx with the request ID stored.
@@ -30,6 +31,19 @@ func WithUserID(ctx context.Context, id string) context.Context {
 // UserIDFromCtx extracts the user ID from ctx, or returns "".
 func UserIDFromCtx(ctx context.Context) string {
 	if v, ok := ctx.Value(ctxKeyUserID).(string); ok {
+		return v
+	}
+	return ""
+}
+
+// WithIP returns a copy of ctx with the client IP stored.
+func WithIP(ctx context.Context, ip string) context.Context {
+	return context.WithValue(ctx, ctxKeyIP, ip)
+}
+
+// IPFromCtx extracts the client IP from ctx, or returns "".
+func IPFromCtx(ctx context.Context) string {
+	if v, ok := ctx.Value(ctxKeyIP).(string); ok {
 		return v
 	}
 	return ""

@@ -3,23 +3,24 @@ package handler
 import (
 	"encoding/json"
 	"log/slog"
-	"net"
 	nethttp "net/http"
-	"strings"
 
+	authevent "localhost/app/auth/event"
 	"localhost/app/auth/service"
 	"localhost/app/core/config"
+	"localhost/app/core/events"
 	"localhost/app/core/http"
 )
 
 // Handler provides HTTP handlers for the authentication endpoints.
 type Handler struct {
 	svc *service.Service
+	bus *events.Bus
 }
 
 // NewHandler creates a Handler with the given session service.
-func NewHandler(svc *service.Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *service.Service, bus *events.Bus) *Handler {
+	return &Handler{svc: svc, bus: bus}
 }
 
 // Login authenticates a user by email and password, creates a session,
@@ -44,7 +45,7 @@ func (h *Handler) Login(w nethttp.ResponseWriter, r *nethttp.Request) {
 		return
 	}
 
-	rawToken, err := h.svc.CreateSession(r.Context(), user.ID, clientIP(r), r.UserAgent())
+	rawToken, err := h.svc.CreateSession(r.Context(), user.ID, http.ClientIP(r), r.UserAgent())
 	if err != nil {
 		slog.ErrorContext(r.Context(), "failed to create session", "error", err)
 		http.WriteError(w, nethttp.StatusInternalServerError, "Internal server error")
@@ -62,6 +63,11 @@ func (h *Handler) Login(w nethttp.ResponseWriter, r *nethttp.Request) {
 	})
 
 	slog.InfoContext(r.Context(), "login successful", "user_id", user.ID, "email", user.Email)
+
+	h.bus.Emit(r.Context(), authevent.AuthLogin{
+		UserID: user.ID,
+		Email:  user.Email,
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
@@ -100,11 +106,17 @@ func (h *Handler) Session(w nethttp.ResponseWriter, r *nethttp.Request) {
 // Logout invalidates the current session and clears the cookie.
 // Protected by RequireAuth middleware.
 func (h *Handler) Logout(w nethttp.ResponseWriter, r *nethttp.Request) {
+	user, _ := service.UserFromContext(r.Context())
 	session, _ := service.SessionFromContext(r.Context())
 
 	if err := h.svc.DeleteSession(r.Context(), session.ID); err != nil {
 		slog.ErrorContext(r.Context(), "failed to delete session", "error", err)
 	}
+
+	h.bus.Emit(r.Context(), authevent.AuthLogout{
+		UserID:    user.ID,
+		SessionID: session.ID,
+	})
 
 	nethttp.SetCookie(w, &nethttp.Cookie{
 		Name:     "standalone_session",
@@ -117,21 +129,4 @@ func (h *Handler) Logout(w nethttp.ResponseWriter, r *nethttp.Request) {
 	})
 
 	w.WriteHeader(nethttp.StatusNoContent)
-}
-
-func clientIP(r *nethttp.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if i := strings.Index(xff, ","); i > 0 {
-			return strings.TrimSpace(xff[:i])
-		}
-		return strings.TrimSpace(xff)
-	}
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return strings.TrimSpace(xri)
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
 }

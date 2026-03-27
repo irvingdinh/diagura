@@ -5,6 +5,7 @@ import (
 
 	"go.uber.org/fx"
 
+	"localhost/app/admin/eventmgmt"
 	"localhost/app/admin/handler"
 	"localhost/app/admin/logmgmt"
 	"localhost/app/admin/profile"
@@ -15,20 +16,22 @@ import (
 )
 
 type Module struct {
-	handler  *handler.Handler
-	profile  *profile.Module
-	usermgmt *usermgmt.Module
-	logmgmt  *logmgmt.Module
-	mw       *middleware.Middleware
+	handler   *handler.Handler
+	profile   *profile.Module
+	usermgmt  *usermgmt.Module
+	logmgmt   *logmgmt.Module
+	eventmgmt *eventmgmt.Module
+	mw        *middleware.Middleware
 }
 
-func moduleImpl(h *handler.Handler, p *profile.Module, um *usermgmt.Module, lm *logmgmt.Module, mw *middleware.Middleware) *Module {
+func moduleImpl(h *handler.Handler, p *profile.Module, um *usermgmt.Module, lm *logmgmt.Module, em *eventmgmt.Module, mw *middleware.Middleware) *Module {
 	return &Module{
-		handler:  h,
-		profile:  p,
-		usermgmt: um,
-		logmgmt:  lm,
-		mw:       mw,
+		handler:   h,
+		profile:   p,
+		usermgmt:  um,
+		logmgmt:   lm,
+		eventmgmt: em,
+		mw:        mw,
 	}
 }
 
@@ -37,6 +40,7 @@ func (m *Module) RegisterRoutes(mux *nethttp.ServeMux) {
 	m.profile.RegisterRoutes(mux)
 	m.usermgmt.RegisterRoutes(mux)
 	m.logmgmt.RegisterRoutes(mux)
+	m.eventmgmt.RegisterRoutes(mux)
 }
 
 func Provide() fx.Option {
@@ -45,6 +49,7 @@ func Provide() fx.Option {
 		profile.Provide(),
 		usermgmt.Provide(),
 		logmgmt.Provide(),
+		eventmgmt.Provide(),
 		fx.Provide(handler.NewHandler),
 		fx.Provide(
 			fx.Annotate(moduleImpl, fx.As(new(http.RouteRegistrar)), fx.ResultTags(`group:"routes"`)),

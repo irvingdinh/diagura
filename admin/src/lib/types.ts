@@ -57,3 +57,25 @@ export interface UserListParams {
   role?: string;
   status?: "active" | "deleted";
 }
+
+export interface EventEntry {
+  id: string;
+  name: string;
+  actor_id: string;
+  request_id: string;
+  ip: string;
+  entity_type: string;
+  entity_id: string;
+  data: string;
+  created_at: string;
+}
+
+export interface EventListParams {
+  page?: number;
+  per_page?: number;
+  name?: string;
+  entity_type?: string;
+  search?: string;
+  date_from?: string;
+  date_to?: string;
+}
