@@ -28,7 +28,7 @@ function eventVariant(
 }
 
 function formatTime(timeStr: string): string {
-  const d = new Date(timeStr);
+  const d = new Date(timeStr + "Z");
   return d.toLocaleString("en-US", {
     month: "short",
     day: "numeric",
@@ -62,6 +62,11 @@ export const EventsTable = ({
   isLoading: boolean;
 }) => {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [prevData, setPrevData] = useState(data);
+  if (data !== prevData) {
+    setPrevData(data);
+    setExpandedIndex(null);
+  }
 
   return (
     <div className="rounded-md border">

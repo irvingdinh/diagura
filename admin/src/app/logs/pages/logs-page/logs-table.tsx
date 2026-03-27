@@ -64,6 +64,11 @@ export const LogsTable = ({
   isLoading: boolean;
 }) => {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [prevData, setPrevData] = useState(data);
+  if (data !== prevData) {
+    setPrevData(data);
+    setExpandedIndex(null);
+  }
 
   return (
     <div className="rounded-md border">

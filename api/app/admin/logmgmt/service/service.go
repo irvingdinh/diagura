@@ -126,6 +126,10 @@ func (s *Service) ListEntries(_ context.Context, filter ListFilter) (*ListResult
 		matched = append(matched, entry)
 	}
 
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("logmgmt: scan log file %s: %w", dateFile, err)
+	}
+
 	total := len(matched)
 
 	// Reverse for newest-first ordering.

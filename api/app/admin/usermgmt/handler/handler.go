@@ -249,6 +249,11 @@ func (h *Handler) Update(w nethttp.ResponseWriter, r *nethttp.Request) {
 		updateInput.RoleID = &role.ID
 	}
 
+	if updateInput.Name == nil && updateInput.Email == nil && updateInput.RoleID == nil {
+		http.WriteError(w, nethttp.StatusBadRequest, "No fields to update")
+		return
+	}
+
 	if err := h.userSvc.UpdateUser(r.Context(), id, updateInput); err != nil {
 		slog.ErrorContext(r.Context(), "failed to update user", "error", err)
 		http.WriteError(w, nethttp.StatusInternalServerError, "Internal server error")
