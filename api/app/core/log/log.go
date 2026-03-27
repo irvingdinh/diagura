@@ -33,30 +33,34 @@ var global state
 //     "text" uses slog.TextHandler (human-readable, good for development).
 //     "json" uses slog.JSONHandler (machine-readable, good for production).
 //     File output is always JSONL regardless of this setting.
+//   - "log.retention_days" (env LOG_RETENTION_DAYS, default 30) — number of
+//     days to keep log files. Files older than this are deleted on rotation.
 //
 // Both sinks include source location. On invalid config the function panics.
 func Load() {
 	config.SetDefaults(config.Values{
-		"log.level":  "info",
-		"log.format": "json",
+		"log.level":          "info",
+		"log.format":         "json",
+		"log.retention_days": 30,
 	})
 
-	config.SetRule("log.level", rule.InFold("debug", "info", "warn", "warning", "error"))
-	config.SetRule("log.format", rule.InFold("text", "json"))
+	config.SetRule("log.level", rule.Required, rule.InFold("debug", "info", "warn", "warning", "error"))
+	config.SetRule("log.format", rule.Required, rule.InFold("text", "json"))
+	config.SetRule("log.retention_days", rule.Required, rule.Between(1, 365))
 
 	var level slog.LevelVar
 	if err := parseLevel(&level, config.GetString("log.level")); err != nil {
 		panic(fmt.Sprintf("log: %v", err))
 	}
 
-	consoleHandler := consoleHandler(config.GetString("log.format"), &level)
+	consoleHandler := newConsoleHandler(config.GetString("log.format"), &level)
 
 	logsDir := filepath.Join(config.GetString("data_dir"), "logs")
 	if err := os.MkdirAll(logsDir, 0o755); err != nil {
 		panic(fmt.Sprintf("log: creating logs directory: %v", err))
 	}
 
-	writer := newDailyFileWriter(logsDir)
+	writer := newDailyFileWriter(logsDir, config.GetInt("log.retention_days"))
 	if prev := swapWriter(writer); prev != nil {
 		_ = prev.Close()
 	}
@@ -110,7 +114,7 @@ func swapWriter(next *dailyFileWriter) *dailyFileWriter {
 	return prev
 }
 
-func consoleHandler(format string, level *slog.LevelVar) slog.Handler {
+func newConsoleHandler(format string, level *slog.LevelVar) slog.Handler {
 	opts := &slog.HandlerOptions{
 		Level:     level,
 		AddSource: true,

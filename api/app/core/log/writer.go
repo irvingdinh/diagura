@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -19,20 +20,22 @@ import (
 // Rotation happens on the first write after the date changes; the mutex
 // serializes writes and protects the current file handle, buffer, and date.
 type dailyFileWriter struct {
-	mu    sync.Mutex
-	dir   string
-	date  string
-	file  *os.File
-	buf   *bufio.Writer
-	nowFn func() time.Time
-	done  chan struct{}
+	mu            sync.Mutex
+	dir           string
+	date          string
+	file          *os.File
+	buf           *bufio.Writer
+	nowFn         func() time.Time
+	done          chan struct{}
+	retentionDays int
 }
 
-func newDailyFileWriter(dir string) *dailyFileWriter {
+func newDailyFileWriter(dir string, retentionDays int) *dailyFileWriter {
 	w := &dailyFileWriter{
-		dir:   dir,
-		nowFn: time.Now,
-		done:  make(chan struct{}),
+		dir:           dir,
+		nowFn:         time.Now,
+		done:          make(chan struct{}),
+		retentionDays: retentionDays,
 	}
 	go w.flushLoop()
 	return w
@@ -89,7 +92,37 @@ func (w *dailyFileWriter) rotate(date string) error {
 	w.file = f
 	w.buf = bufio.NewWriterSize(f, 64*1024)
 	w.date = date
+
+	w.cleanup()
+
 	return nil
+}
+
+// cleanup removes .log files older than retentionDays. Called once per
+// rotation (i.e. once per calendar day). Errors are reported to stderr
+// but never block logging.
+func (w *dailyFileWriter) cleanup() {
+	cutoff := w.nowFn().AddDate(0, 0, -w.retentionDays)
+	entries, err := os.ReadDir(w.dir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "log: cleanup: listing directory: %v\n", err)
+		return
+	}
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".log" {
+			continue
+		}
+		name := strings.TrimSuffix(e.Name(), ".log")
+		t, err := time.Parse("2006_01_02", name)
+		if err != nil {
+			continue
+		}
+		if t.Before(cutoff) {
+			if err := os.Remove(filepath.Join(w.dir, e.Name())); err != nil {
+				fmt.Fprintf(os.Stderr, "log: cleanup: removing %s: %v\n", e.Name(), err)
+			}
+		}
+	}
 }
 
 // Flush writes any buffered data to the underlying file.
@@ -104,6 +137,11 @@ func (w *dailyFileWriter) Flush() error {
 
 // Close stops the background flush goroutine, flushes remaining data, and
 // closes the file handle. Safe to call multiple times.
+//
+// Write after Close silently reopens a new file (without the periodic flush
+// goroutine). This is intentional — matching lumberjack's behavior — so that
+// deferred functions or panic handlers that log during shutdown still reach
+// disk rather than being silently discarded by slog.
 func (w *dailyFileWriter) Close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
