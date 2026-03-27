@@ -4,41 +4,23 @@ import (
 	"encoding/json"
 	nethttp "net/http"
 	"strconv"
-	"time"
 
-	"localhost/app/auth/service"
-	"localhost/app/core/sqlite"
-	"localhost/app/core/sqlite/orm"
-	"localhost/app/user/entity"
+	"localhost/app/user/service"
 )
 
-const userRoleID = "00000000-0000-7000-0000-000000000002"
-
 type Handler struct {
-	db *sqlite.DB
+	svc *service.Service
 }
 
-func NewHandler(db *sqlite.DB) *Handler {
-	return &Handler{db: db}
+func NewHandler(svc *service.Service) *Handler {
+	return &Handler{svc: svc}
 }
 
 func (h *Handler) List(w nethttp.ResponseWriter, r *nethttp.Request) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 
-	b := orm.Select("id", "role_id", "email", "name", "created_at", "updated_at").
-		From("users").
-		Where("deleted_at IS NULL").
-		OrderBy("created_at", "DESC")
-	if limit > 0 {
-		b = b.Limit(limit)
-	}
-	if offset > 0 {
-		b = b.Offset(offset)
-	}
-	query, args := b.Build()
-
-	users, err := orm.QueryAll[entity.User](h.db, query, args...)
+	users, err := h.svc.List(r.Context(), limit, offset)
 	if err != nil {
 		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
 		return
@@ -63,26 +45,12 @@ func (h *Handler) Create(w nethttp.ResponseWriter, r *nethttp.Request) {
 		return
 	}
 
-	passwordHash, err := service.HashPassword(input.Password)
+	result, err := h.svc.Create(r.Context(), service.CreateInput{
+		Email:    input.Email,
+		Name:     input.Name,
+		Password: input.Password,
+	})
 	if err != nil {
-		nethttp.Error(w, "internal server error", nethttp.StatusInternalServerError)
-		return
-	}
-
-	now := orm.FormatTime(time.Now())
-	id := orm.NewID()
-
-	query, args := orm.Insert("users").
-		Set("id", id).
-		Set("role_id", userRoleID).
-		Set("email", input.Email).
-		Set("name", input.Name).
-		Set("password_hash", passwordHash).
-		Set("created_at", now).
-		Set("updated_at", now).
-		Build()
-
-	if _, err := h.db.Exec(query, args...); err != nil {
 		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
 		return
 	}
@@ -91,9 +59,9 @@ func (h *Handler) Create(w nethttp.ResponseWriter, r *nethttp.Request) {
 	w.WriteHeader(nethttp.StatusCreated)
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"data": map[string]string{
-			"id":    id,
-			"email": input.Email,
-			"name":  input.Name,
+			"id":    result.ID,
+			"email": result.Email,
+			"name":  result.Name,
 		},
 	})
 }

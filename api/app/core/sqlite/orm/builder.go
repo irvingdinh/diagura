@@ -108,7 +108,17 @@ func (b *SelectBuilder) Build() (string, []any) {
 	if len(b.columns) == 0 {
 		buf.WriteString("*")
 	} else {
-		buf.WriteString(strings.Join(b.columns, ", "))
+		for i, col := range b.columns {
+			if i > 0 {
+				buf.WriteString(", ")
+			}
+			buf.WriteString(col)
+			if strings.Contains(col, ".") && !strings.ContainsAny(col, " (*") {
+				buf.WriteString(` AS "`)
+				buf.WriteString(col)
+				buf.WriteString(`"`)
+			}
+		}
 	}
 
 	buf.WriteString(" FROM ")

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"localhost/app/core/sqlite"
+	"localhost/app/core/utils"
 )
 
 // Querier is satisfied by *sqlite.DB and *sqlite.Tx.
@@ -125,19 +126,19 @@ func getMapping(t reflect.Type) *fieldMapping {
 		return v.(*fieldMapping)
 	}
 	m := &fieldMapping{colToIndex: make(map[string][]int)}
-	buildMapping(t, nil, m)
+	buildMapping(t, nil, "", m)
 	mappingCache.Store(t, m)
 	return m
 }
 
-func buildMapping(t reflect.Type, prefix []int, m *fieldMapping) {
+func buildMapping(t reflect.Type, indexPrefix []int, colPrefix string, m *fieldMapping) {
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
 		if !f.IsExported() {
 			continue
 		}
 
-		idx := append(append([]int{}, prefix...), i)
+		idx := append(append([]int{}, indexPrefix...), i)
 
 		if f.Anonymous {
 			ft := f.Type
@@ -145,7 +146,13 @@ func buildMapping(t reflect.Type, prefix []int, m *fieldMapping) {
 				ft = ft.Elem()
 			}
 			if ft.Kind() == reflect.Struct {
-				buildMapping(ft, idx, m)
+				embedPrefix := colPrefix
+				if tag := f.Tag.Get("db"); tag == "-" {
+					continue
+				} else if tag != "" {
+					embedPrefix = tag
+				}
+				buildMapping(ft, idx, embedPrefix, m)
 				continue
 			}
 		}
@@ -153,6 +160,9 @@ func buildMapping(t reflect.Type, prefix []int, m *fieldMapping) {
 		tag := f.Tag.Get("db")
 		if tag == "" || tag == "-" {
 			continue
+		}
+		if colPrefix != "" {
+			tag = colPrefix + "." + tag
 		}
 		m.colToIndex[tag] = idx
 	}
@@ -222,15 +232,9 @@ func setField(field reflect.Value, rawVal any) error {
 	if fieldType == reflect.TypeOf(time.Time{}) {
 		switch v := rawVal.(type) {
 		case string:
-			t, err := time.Parse(timeFormat, v)
+			t, err := utils.ParseTime(v)
 			if err != nil {
-				t, err = time.Parse(timeFormatMs, v)
-				if err != nil {
-					t, err = time.Parse(time.RFC3339, v)
-					if err != nil {
-						return fmt.Errorf("parse time %q: %w", v, err)
-					}
-				}
+				return err
 			}
 			field.Set(reflect.ValueOf(t))
 			return nil

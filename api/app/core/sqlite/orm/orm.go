@@ -5,6 +5,8 @@ import (
 	"errors"
 	"sync"
 	"time"
+
+	"localhost/app/core/utils"
 )
 
 // ErrNotFound is returned when a query expects a row but finds none.
@@ -134,13 +136,7 @@ func generateUUIDv7(now time.Time) string {
 	return string(buf[:])
 }
 
-// Time format constants for parsing SQLite TEXT timestamps.
-const (
-	timeFormat   = "2006-01-02 15:04:05"
-	timeFormatMs = "2006-01-02 15:04:05.000"
-)
-
 // FormatTime formats a time.Time for SQLite TEXT columns.
 func FormatTime(t time.Time) string {
-	return t.UTC().Format(timeFormatMs)
+	return utils.FormatTime(t)
 }

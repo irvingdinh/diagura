@@ -6,23 +6,19 @@ import (
 	"net"
 	nethttp "net/http"
 	"strings"
-	"time"
 
 	"localhost/app/auth/service"
 	"localhost/app/core/config"
-	"localhost/app/core/sqlite"
-	"localhost/app/core/sqlite/orm"
 )
 
 // Handler provides HTTP handlers for the authentication endpoints.
 type Handler struct {
-	db  *sqlite.DB
 	svc *service.Service
 }
 
-// NewHandler creates a Handler with the given database and session service.
-func NewHandler(db *sqlite.DB, svc *service.Service) *Handler {
-	return &Handler{db: db, svc: svc}
+// NewHandler creates a Handler with the given session service.
+func NewHandler(svc *service.Service) *Handler {
+	return &Handler{svc: svc}
 }
 
 // Login authenticates a user by email and password, creates a session,
@@ -41,40 +37,13 @@ func (h *Handler) Login(w nethttp.ResponseWriter, r *nethttp.Request) {
 		return
 	}
 
-	// Look up user by email, join roles for slug.
-	query, args := orm.Select("u.id", "u.email", "u.name", "u.password_hash", "r.slug").
-		From("users u").
-		Join("roles r", "r.id = u.role_id").
-		Where("u.email = ?", input.Email).
-		Where("u.deleted_at IS NULL").
-		Build()
-
-	row := h.db.QueryRow(query, args...)
-	var userID, email, name, passwordHash, roleSlug string
-	if err := row.Scan(&userID, &email, &name, &passwordHash, &roleSlug); err != nil {
+	user, err := h.svc.AuthenticateByEmail(r.Context(), input.Email, input.Password)
+	if err != nil {
 		writeError(w, nethttp.StatusUnauthorized, "Invalid email or password")
 		return
 	}
 
-	ok, err := service.VerifyPassword(passwordHash, input.Password)
-	if err != nil || !ok {
-		writeError(w, nethttp.StatusUnauthorized, "Invalid email or password")
-		return
-	}
-
-	// Transparent parameter upgrade.
-	if service.NeedsRehash(passwordHash) {
-		if newHash, err := service.HashPassword(input.Password); err == nil {
-			q, a := orm.Update("users").
-				Set("password_hash", newHash).
-				Set("updated_at", orm.FormatTime(time.Now())).
-				Where("id = ?", userID).
-				Build()
-			_, _ = h.db.Exec(q, a...)
-		}
-	}
-
-	rawToken, err := h.svc.CreateSession(r.Context(), userID, clientIP(r), r.UserAgent())
+	rawToken, err := h.svc.CreateSession(r.Context(), user.ID, clientIP(r), r.UserAgent())
 	if err != nil {
 		slog.ErrorContext(r.Context(), "failed to create session", "error", err)
 		writeError(w, nethttp.StatusInternalServerError, "Internal server error")
@@ -91,15 +60,15 @@ func (h *Handler) Login(w nethttp.ResponseWriter, r *nethttp.Request) {
 		MaxAge:   365 * 24 * 60 * 60,
 	})
 
-	slog.InfoContext(r.Context(), "login successful", "user_id", userID, "email", email)
+	slog.InfoContext(r.Context(), "login successful", "user_id", user.ID, "email", user.Email)
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"data": map[string]string{
-			"id":    userID,
-			"email": email,
-			"name":  name,
-			"role":  roleSlug,
+			"id":    user.ID,
+			"email": user.Email,
+			"name":  user.Name,
+			"role":  user.RoleSlug,
 		},
 	})
 }

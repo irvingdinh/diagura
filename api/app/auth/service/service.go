@@ -11,9 +11,8 @@ import (
 
 	"localhost/app/core/sqlite"
 	"localhost/app/core/sqlite/orm"
+	"localhost/app/core/utils"
 )
-
-const timeFormatMs = "2006-01-02 15:04:05.000"
 
 const (
 	sessionSlidingDays  = 30
@@ -128,11 +127,11 @@ func (s *Service) ValidateSession(ctx context.Context, tokenHash string) (*AuthU
 	}
 
 	now := time.Now().UTC()
-	exp, err := time.Parse(timeFormatMs, expiresAt)
+	exp, err := utils.ParseTime(expiresAt)
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse expires_at: %w", err)
 	}
-	absExp, err := time.Parse(timeFormatMs, absoluteExpiresAt)
+	absExp, err := utils.ParseTime(absoluteExpiresAt)
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse absolute_expires_at: %w", err)
 	}
@@ -155,6 +154,55 @@ func (s *Service) ValidateSession(ctx context.Context, tokenHash string) (*AuthU
 	}
 
 	return user, session, nil
+}
+
+// userRow is an internal type for scanning the user+role JOIN query.
+type userRow struct {
+	ID           string `db:"u.id"`
+	Email        string `db:"u.email"`
+	Name         string `db:"u.name"`
+	PasswordHash string `db:"u.password_hash"`
+	RoleSlug     string `db:"r.slug"`
+}
+
+// AuthenticateByEmail verifies the email/password combination and returns
+// the authenticated user. Transparently rehashes the password if the stored
+// hash uses outdated parameters.
+func (s *Service) AuthenticateByEmail(ctx context.Context, email, password string) (*AuthUser, error) {
+	query, args := orm.Select("u.id", "u.email", "u.name", "u.password_hash", "r.slug").
+		From("users u").
+		Join("roles r", "r.id = u.role_id").
+		Where("u.email = ?", email).
+		Where("u.deleted_at IS NULL").
+		Build()
+
+	row, err := orm.QueryOne[userRow](s.db, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("invalid credentials")
+	}
+
+	ok, err := VerifyPassword(row.PasswordHash, password)
+	if err != nil || !ok {
+		return nil, fmt.Errorf("invalid credentials")
+	}
+
+	if NeedsRehash(row.PasswordHash) {
+		if newHash, err := HashPassword(password); err == nil {
+			q, a := orm.Update("users").
+				Set("password_hash", newHash).
+				Set("updated_at", utils.FormatTime(time.Now())).
+				Where("id = ?", row.ID).
+				Build()
+			_, _ = s.db.Exec(q, a...)
+		}
+	}
+
+	return &AuthUser{
+		ID:       row.ID,
+		Email:    row.Email,
+		Name:     row.Name,
+		RoleSlug: row.RoleSlug,
+	}, nil
 }
 
 // CreateSession generates a new session token, stores a hashed version in

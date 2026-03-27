@@ -19,6 +19,7 @@ Reference these guidelines when:
 - Writing module constructors that depend on configuration
 - Testing code that uses the config package
 - Adding new config keys to the application
+- Structuring modules with service layers and handler separation
 
 ## Rule Categories
 
@@ -31,6 +32,7 @@ Reference these guidelines when:
 ### 1. Core Packages
 
 - `core-config` - Config package lifecycle, defaults, validation, getters, testing
+- `core-module-service` - Module service layer convention, handler/service separation, cross-module imports
 
 ## How to Use
 

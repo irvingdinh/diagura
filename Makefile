@@ -5,10 +5,10 @@ install:
 	@cd api && go mod download
 
 kill:
-	@-lsof -ti :48310 | xargs kill -9 2>/dev/null; true
+	@-lsof -ti :48310 | xargs kill -15 2>/dev/null; true
 
 kill-ui:
-	@-lsof -ti :48305 | xargs kill -9 2>/dev/null; true
+	@-lsof -ti :48305 | xargs kill -15 2>/dev/null; true
 
 run: kill
 	@cd api && go run .

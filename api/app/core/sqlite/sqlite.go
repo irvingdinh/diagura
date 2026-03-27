@@ -503,6 +503,55 @@ func (r *Rows) Scan(dest ...any) error {
 			}
 		case *bool:
 			*ptr = r.stmt.ColumnInt64(i) != 0
+		case **int:
+			if colType == driver.TypeNull {
+				*ptr = nil
+			} else {
+				v := int(r.stmt.ColumnInt64(i))
+				*ptr = &v
+			}
+		case **int32:
+			if colType == driver.TypeNull {
+				*ptr = nil
+			} else {
+				v := int32(r.stmt.ColumnInt64(i))
+				*ptr = &v
+			}
+		case **int64:
+			if colType == driver.TypeNull {
+				*ptr = nil
+			} else {
+				v := r.stmt.ColumnInt64(i)
+				*ptr = &v
+			}
+		case **float32:
+			if colType == driver.TypeNull {
+				*ptr = nil
+			} else {
+				v := float32(r.stmt.ColumnFloat64(i))
+				*ptr = &v
+			}
+		case **float64:
+			if colType == driver.TypeNull {
+				*ptr = nil
+			} else {
+				v := r.stmt.ColumnFloat64(i)
+				*ptr = &v
+			}
+		case **string:
+			if colType == driver.TypeNull {
+				*ptr = nil
+			} else {
+				v := r.stmt.ColumnText(i)
+				*ptr = &v
+			}
+		case **bool:
+			if colType == driver.TypeNull {
+				*ptr = nil
+			} else {
+				v := r.stmt.ColumnInt64(i) != 0
+				*ptr = &v
+			}
 		case *any:
 			switch colType {
 			case driver.TypeInteger:

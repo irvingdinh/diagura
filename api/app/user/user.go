@@ -8,6 +8,7 @@ import (
 	"localhost/app/auth/middleware"
 	"localhost/app/core/http"
 	"localhost/app/user/handler"
+	"localhost/app/user/service"
 )
 
 type Module struct {
@@ -29,6 +30,7 @@ func (m *Module) RegisterRoutes(mux *nethttp.ServeMux) {
 
 func Provide() fx.Option {
 	return fx.Options(
+		fx.Provide(service.NewService),
 		fx.Provide(handler.NewHandler),
 		fx.Provide(
 			fx.Annotate(moduleImpl, fx.As(new(http.RouteRegistrar)), fx.ResultTags(`group:"routes"`)),
