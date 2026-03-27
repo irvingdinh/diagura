@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"localhost/app/core/sqlite/driver"
+	"localhost/app/core/utils"
 )
 
 // Migration represents a parsed migration file.
@@ -198,7 +199,10 @@ func (e *Engine) Status(_ context.Context) ([]MigrationStatus, error) {
 		}
 		version := int(stmt.ColumnInt64(0))
 		appliedAt := stmt.ColumnText(1)
-		t, _ := time.Parse(time.RFC3339, appliedAt)
+		t, err := utils.ParseTime(appliedAt)
+		if err != nil {
+			return nil, fmt.Errorf("migration: status: parse applied_at for version %d: %w", version, err)
+		}
 		appliedMap[version] = t
 	}
 
@@ -278,7 +282,7 @@ func (e *Engine) applyUp(m Migration) error {
 
 	if err := e.execWithArgs(
 		"INSERT INTO _migrations (version, name, applied_at) VALUES (?, ?, ?)",
-		m.Version, m.Name, time.Now().UTC().Format(time.RFC3339),
+		m.Version, m.Name, utils.FormatTime(time.Now()),
 	); err != nil {
 		_ = e.conn.Exec("ROLLBACK")
 		return err
