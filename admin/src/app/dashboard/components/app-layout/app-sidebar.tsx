@@ -2,6 +2,7 @@ import {
   ChevronsUpDown,
   LayoutDashboard,
   LogOut,
+  ScrollText,
   User,
   Users,
 } from "lucide-react";
@@ -45,6 +46,7 @@ function initials(name: string): string {
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/admin" },
   { label: "Users", icon: Users, href: "/admin/users" },
+  { label: "Logs", icon: ScrollText, href: "/admin/logs" },
 ];
 
 export const AppSidebar = ({

@@ -34,6 +34,22 @@ export interface ApiListResponse<T> {
   meta: PaginationMeta;
 }
 
+export interface LogEntry {
+  time: string;
+  level: string;
+  msg: string;
+  source?: { function: string; file: string; line: number };
+  [key: string]: unknown;
+}
+
+export interface LogListParams {
+  date?: string;
+  page?: number;
+  per_page?: number;
+  level?: string;
+  search?: string;
+}
+
 export interface UserListParams {
   page?: number;
   per_page?: number;
