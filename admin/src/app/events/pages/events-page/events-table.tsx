@@ -169,7 +169,7 @@ export const EventsTable = ({
                             IP
                           </span>
                           <span className="font-mono">{entry.ip || "—"}</span>
-                          {entry.entity_type && (
+                          {entry.entity_type && entry.entity_id && (
                             <>
                               <span className="text-muted-foreground font-medium">
                                 Entity
