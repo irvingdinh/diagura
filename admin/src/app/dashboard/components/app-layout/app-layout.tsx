@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router";
 
-import { AppSidebar } from "@/app/dashboard/components/app-layout/app-sidebar";
 import {
   SidebarInset,
   SidebarProvider,
@@ -9,6 +8,8 @@ import {
 } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/hooks/use-session";
+
+import { AppSidebar } from "./app-sidebar";
 
 export const AppLayout = ({ children }: { children: ReactNode }) => {
   const session = useSession();
