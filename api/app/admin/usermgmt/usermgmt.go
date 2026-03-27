@@ -1,7 +1,7 @@
 package usermgmt
 
 import (
-	nethttp "net/http"
+	"net/http"
 
 	"go.uber.org/fx"
 
@@ -24,7 +24,7 @@ func newModule(h *handler.Handler, mw *middleware.Middleware) *Module {
 }
 
 // RegisterRoutes registers user management endpoints on the given mux.
-func (m *Module) RegisterRoutes(mux *nethttp.ServeMux) {
+func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/admin/users", m.mw.RequireAdmin(m.handler.List))
 	mux.HandleFunc("POST /api/admin/users", m.mw.RequireAdmin(m.handler.Create))
 	mux.HandleFunc("GET /api/admin/users/{id}", m.mw.RequireAdmin(m.handler.Get))

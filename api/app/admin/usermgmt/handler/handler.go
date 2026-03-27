@@ -334,14 +334,15 @@ func (h *Handler) SetPassword(w nethttp.ResponseWriter, r *nethttp.Request) {
 
 	if err := h.svc.InvalidateAllSessions(r.Context(), target.ID); err != nil {
 		slog.ErrorContext(r.Context(), "failed to invalidate sessions", "error", err)
+	} else {
+		h.bus.Emit(r.Context(), authevent.SessionInvalidatedAll{
+			UserID: id,
+		})
 	}
 
 	h.bus.Emit(r.Context(), userevent.UserPasswordSet{
 		UserID: id,
 		SetBy:  actor.ID,
-	})
-	h.bus.Emit(r.Context(), authevent.SessionInvalidatedAll{
-		UserID: id,
 	})
 
 	w.WriteHeader(nethttp.StatusNoContent)
@@ -381,14 +382,15 @@ func (h *Handler) Delete(w nethttp.ResponseWriter, r *nethttp.Request) {
 
 	if err := h.svc.InvalidateAllSessions(r.Context(), id); err != nil {
 		slog.ErrorContext(r.Context(), "failed to invalidate sessions", "error", err)
+	} else {
+		h.bus.Emit(r.Context(), authevent.SessionInvalidatedAll{
+			UserID: id,
+		})
 	}
 
 	h.bus.Emit(r.Context(), userevent.UserDeleted{
 		UserID: id,
 		Email:  target.Email,
-	})
-	h.bus.Emit(r.Context(), authevent.SessionInvalidatedAll{
-		UserID: id,
 	})
 
 	w.WriteHeader(nethttp.StatusNoContent)

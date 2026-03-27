@@ -1,7 +1,7 @@
 package eventmgmt
 
 import (
-	nethttp "net/http"
+	"net/http"
 
 	"go.uber.org/fx"
 
@@ -23,7 +23,7 @@ func newModule(h *handler.Handler, mw *middleware.Middleware) *Module {
 }
 
 // RegisterRoutes registers event viewer endpoints on the given mux.
-func (m *Module) RegisterRoutes(mux *nethttp.ServeMux) {
+func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/admin/events", m.mw.RequireAdmin(m.handler.List))
 	mux.HandleFunc("GET /api/admin/events/names", m.mw.RequireAdmin(m.handler.Names))
 }
