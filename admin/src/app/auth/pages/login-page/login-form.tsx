@@ -1,4 +1,8 @@
+import { useMutation } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 import type { ComponentProps } from "react";
+import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -8,11 +12,55 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
+interface LoginFormValues {
+  email: string;
+  password: string;
+}
+
+async function login(values: LoginFormValues) {
+  const res = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(values),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? "Something went wrong");
+  }
+
+  return res.json();
+}
+
 export const LoginForm = ({ className, ...props }: ComponentProps<"div">) => {
+  const navigate = useNavigate();
+
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = useForm<LoginFormValues>();
+
+  const mutation = useMutation({
+    mutationFn: login,
+    onSuccess: () => navigate("/admin"),
+    onError: (error: Error) => {
+      setError("root", { message: error.message });
+    },
+  });
+
+  const onSubmit = handleSubmit((values) => mutation.mutate(values));
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -23,7 +71,7 @@ export const LoginForm = ({ className, ...props }: ComponentProps<"div">) => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form>
+          <form onSubmit={onSubmit}>
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="email">Email</FieldLabel>
@@ -31,8 +79,16 @@ export const LoginForm = ({ className, ...props }: ComponentProps<"div">) => {
                   id="email"
                   type="email"
                   placeholder="m@example.com"
-                  required
+                  aria-invalid={!!errors.email}
+                  {...register("email", {
+                    required: "Email is required",
+                    pattern: {
+                      value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                      message: "Enter a valid email address",
+                    },
+                  })}
                 />
+                <FieldError errors={[errors.email]} />
               </Field>
               <Field>
                 <div className="flex items-center">
@@ -44,10 +100,21 @@ export const LoginForm = ({ className, ...props }: ComponentProps<"div">) => {
                     Forgot your password?
                   </a>
                 </div>
-                <Input id="password" type="password" required />
+                <Input
+                  id="password"
+                  type="password"
+                  aria-invalid={!!errors.password || !!errors.root}
+                  {...register("password", {
+                    required: "Password is required",
+                  })}
+                />
+                <FieldError errors={[errors.password, errors.root]} />
               </Field>
               <Field>
-                <Button type="submit">Login</Button>
+                <Button type="submit" disabled={mutation.isPending}>
+                  {mutation.isPending && <Loader2 className="animate-spin" />}
+                  {mutation.isPending ? "Logging in\u2026" : "Login"}
+                </Button>
               </Field>
             </FieldGroup>
           </form>
