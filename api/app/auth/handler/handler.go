@@ -65,11 +65,12 @@ func (h *Handler) Login(w nethttp.ResponseWriter, r *nethttp.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"data": map[string]string{
-			"id":    user.ID,
-			"email": user.Email,
-			"name":  user.Name,
-			"role":  user.RoleSlug,
+		"data": map[string]any{
+			"id":                    user.ID,
+			"email":                 user.Email,
+			"name":                  user.Name,
+			"role":                  user.RoleSlug,
+			"force_password_change": user.ForcePasswordChange,
 		},
 	})
 }
@@ -86,11 +87,12 @@ func (h *Handler) Session(w nethttp.ResponseWriter, r *nethttp.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"data": map[string]string{
-			"id":    user.ID,
-			"email": user.Email,
-			"name":  user.Name,
-			"role":  user.RoleSlug,
+		"data": map[string]any{
+			"id":                    user.ID,
+			"email":                 user.Email,
+			"name":                  user.Name,
+			"role":                  user.RoleSlug,
+			"force_password_change": user.ForcePasswordChange,
 		},
 	})
 }

@@ -33,10 +33,11 @@ const (
 // AuthUser holds the authenticated user's identity, set on the request
 // context by the auth middleware.
 type AuthUser struct {
-	ID       string
-	Email    string
-	Name     string
-	RoleSlug string
+	ID                  string
+	Email               string
+	Name                string
+	RoleSlug            string
+	ForcePasswordChange bool
 }
 
 // AuthSession holds session metadata, set on the request context by
@@ -93,7 +94,7 @@ func HashToken(rawToken string) string {
 
 const validateQuery = `SELECT s.id, s.user_id, s.expires_at, s.absolute_expires_at,
        s.ip_address, s.user_agent, s.created_at,
-       u.id, u.email, u.name, u.deleted_at,
+       u.id, u.email, u.name, u.deleted_at, u.force_password_change,
        r.slug
 FROM sessions s
 JOIN users u ON u.id = s.user_id
@@ -110,13 +111,14 @@ func (s *Service) ValidateSession(ctx context.Context, tokenHash string) (*AuthU
 		ipAddress, userAgent, sessCreatedAt              string
 		userID, email, name                              string
 		deletedAt                                        any
+		forcePasswordChange                              bool
 		roleSlug                                         string
 	)
 
 	if err := row.Scan(
 		&sessID, &sessUserID, &expiresAt, &absoluteExpiresAt,
 		&ipAddress, &userAgent, &sessCreatedAt,
-		&userID, &email, &name, &deletedAt,
+		&userID, &email, &name, &deletedAt, &forcePasswordChange,
 		&roleSlug,
 	); err != nil {
 		return nil, nil, fmt.Errorf("session not found")
@@ -140,10 +142,11 @@ func (s *Service) ValidateSession(ctx context.Context, tokenHash string) (*AuthU
 	}
 
 	user := &AuthUser{
-		ID:       userID,
-		Email:    email,
-		Name:     name,
-		RoleSlug: roleSlug,
+		ID:                  userID,
+		Email:               email,
+		Name:                name,
+		RoleSlug:            roleSlug,
+		ForcePasswordChange: forcePasswordChange,
 	}
 	session := &AuthSession{
 		ID:        sessID,
@@ -158,18 +161,19 @@ func (s *Service) ValidateSession(ctx context.Context, tokenHash string) (*AuthU
 
 // userRow is an internal type for scanning the user+role JOIN query.
 type userRow struct {
-	ID           string `db:"u.id"`
-	Email        string `db:"u.email"`
-	Name         string `db:"u.name"`
-	PasswordHash string `db:"u.password_hash"`
-	RoleSlug     string `db:"r.slug"`
+	ID                  string `db:"u.id"`
+	Email               string `db:"u.email"`
+	Name                string `db:"u.name"`
+	PasswordHash        string `db:"u.password_hash"`
+	ForcePasswordChange bool   `db:"u.force_password_change"`
+	RoleSlug            string `db:"r.slug"`
 }
 
 // AuthenticateByEmail verifies the email/password combination and returns
 // the authenticated user. Transparently rehashes the password if the stored
 // hash uses outdated parameters.
 func (s *Service) AuthenticateByEmail(ctx context.Context, email, password string) (*AuthUser, error) {
-	query, args := orm.Select("u.id", "u.email", "u.name", "u.password_hash", "r.slug").
+	query, args := orm.Select("u.id", "u.email", "u.name", "u.password_hash", "u.force_password_change", "r.slug").
 		From("users u").
 		Join("roles r", "r.id = u.role_id").
 		Where("u.email = ?", email).
@@ -198,10 +202,11 @@ func (s *Service) AuthenticateByEmail(ctx context.Context, email, password strin
 	}
 
 	return &AuthUser{
-		ID:       row.ID,
-		Email:    row.Email,
-		Name:     row.Name,
-		RoleSlug: row.RoleSlug,
+		ID:                  row.ID,
+		Email:               row.Email,
+		Name:                row.Name,
+		RoleSlug:            row.RoleSlug,
+		ForcePasswordChange: row.ForcePasswordChange,
 	}, nil
 }
 
@@ -244,6 +249,29 @@ func (s *Service) DeleteSession(ctx context.Context, sessionID string) error {
 	query, args := orm.Delete("sessions").Where("id = ?", sessionID).Build()
 	if _, err := s.db.Exec(query, args...); err != nil {
 		return fmt.Errorf("delete session: %w", err)
+	}
+	return nil
+}
+
+// DeleteOtherSessions removes all sessions for a user except the specified one.
+func (s *Service) DeleteOtherSessions(ctx context.Context, userID, keepSessionID string) error {
+	query, args := orm.Delete("sessions").
+		Where("user_id = ?", userID).
+		Where("id != ?", keepSessionID).
+		Build()
+	if _, err := s.db.Exec(query, args...); err != nil {
+		return fmt.Errorf("delete other sessions: %w", err)
+	}
+	return nil
+}
+
+// DeleteAllUserSessions removes every session for the given user.
+func (s *Service) DeleteAllUserSessions(ctx context.Context, userID string) error {
+	query, args := orm.Delete("sessions").
+		Where("user_id = ?", userID).
+		Build()
+	if _, err := s.db.Exec(query, args...); err != nil {
+		return fmt.Errorf("delete all user sessions: %w", err)
 	}
 	return nil
 }

@@ -1,4 +1,4 @@
-.PHONY: install kill kill-ui run run-ui lint lint-ui
+.PHONY: install kill run lint
 
 install:
 	@go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
@@ -6,15 +6,12 @@ install:
 
 kill:
 	@-lsof -ti :48310 | xargs kill -15 2>/dev/null; true
-
-kill-ui:
 	@-lsof -ti :48305 | xargs kill -15 2>/dev/null; true
 
 run: kill
-	@cd api && go run .
-
-run-ui: kill-ui
-	@cd admin && bun dev
+	@cd api && LOG_FORMAT=text go run . & \
+		cd admin && bun dev & \
+		wait
 
 lint:
 	@cd admin && bun run lint:fix
