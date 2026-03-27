@@ -38,6 +38,7 @@ import type { SessionUser } from "@/lib/types";
 function initials(name: string): string {
   return name
     .split(" ")
+    .filter(Boolean)
     .map((w) => w[0])
     .join("")
     .toUpperCase()

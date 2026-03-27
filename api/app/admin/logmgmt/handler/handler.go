@@ -90,7 +90,7 @@ func (h *Handler) List(w nethttp.ResponseWriter, r *nethttp.Request) {
 
 // Dates returns all dates that have log files, sorted newest first.
 func (h *Handler) Dates(w nethttp.ResponseWriter, r *nethttp.Request) {
-	dates, err := h.svc.AvailableDates()
+	dates, err := h.svc.AvailableDates(r.Context())
 	if err != nil {
 		slog.ErrorContext(r.Context(), "failed to list log dates", "error", err)
 		http.WriteError(w, nethttp.StatusInternalServerError, "Internal server error")

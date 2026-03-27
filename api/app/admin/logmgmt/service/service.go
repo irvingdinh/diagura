@@ -51,7 +51,7 @@ func NewService() *Service {
 
 // AvailableDates returns all dates that have log files, sorted newest first.
 // Each date is formatted as "2006-01-02".
-func (s *Service) AvailableDates() ([]string, error) {
+func (s *Service) AvailableDates(_ context.Context) ([]string, error) {
 	entries, err := os.ReadDir(s.logsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
