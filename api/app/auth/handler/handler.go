@@ -117,12 +117,12 @@ func (h *Handler) Logout(w nethttp.ResponseWriter, r *nethttp.Request) {
 
 	if err := h.svc.DeleteSession(r.Context(), session.ID); err != nil {
 		slog.ErrorContext(r.Context(), "failed to delete session", "error", err)
+	} else {
+		h.bus.Emit(r.Context(), authevent.AuthLogout{
+			UserID:    user.ID,
+			SessionID: session.ID,
+		})
 	}
-
-	h.bus.Emit(r.Context(), authevent.AuthLogout{
-		UserID:    user.ID,
-		SessionID: session.ID,
-	})
 
 	nethttp.SetCookie(w, &nethttp.Cookie{
 		Name:     service.CookieName,
