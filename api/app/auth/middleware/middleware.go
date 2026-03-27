@@ -1,11 +1,11 @@
 package middleware
 
 import (
-	"encoding/json"
 	"log/slog"
 	nethttp "net/http"
 
 	"localhost/app/auth/service"
+	"localhost/app/core/http"
 	"localhost/app/core/log"
 )
 
@@ -53,7 +53,7 @@ func (m *Middleware) RequireRoles(next nethttp.HandlerFunc, roleSlugs ...string)
 				"role", user.RoleSlug,
 				"required", roleSlugs,
 			)
-			writeError(w, nethttp.StatusForbidden, "Forbidden")
+			http.WriteError(w, nethttp.StatusForbidden, "Forbidden")
 			return
 		}
 
@@ -77,7 +77,7 @@ func (m *Middleware) RequireAdmin(next nethttp.HandlerFunc) nethttp.HandlerFunc 
 func (m *Middleware) authenticate(w nethttp.ResponseWriter, r *nethttp.Request) (*nethttp.Request, *service.AuthUser, bool) {
 	cookie, err := r.Cookie("standalone_session")
 	if err != nil {
-		writeError(w, nethttp.StatusUnauthorized, "Unauthorized")
+		http.WriteError(w, nethttp.StatusUnauthorized, "Unauthorized")
 		return r, nil, false
 	}
 
@@ -85,7 +85,7 @@ func (m *Middleware) authenticate(w nethttp.ResponseWriter, r *nethttp.Request) 
 	user, session, err := m.svc.ValidateSession(r.Context(), tokenHash)
 	if err != nil {
 		slog.DebugContext(r.Context(), "session validation failed", "error", err)
-		writeError(w, nethttp.StatusUnauthorized, "Unauthorized")
+		http.WriteError(w, nethttp.StatusUnauthorized, "Unauthorized")
 		return r, nil, false
 	}
 
@@ -95,10 +95,4 @@ func (m *Middleware) authenticate(w nethttp.ResponseWriter, r *nethttp.Request) 
 	ctx = log.WithUserID(ctx, user.ID)
 
 	return r.WithContext(ctx), user, true
-}
-
-func writeError(w nethttp.ResponseWriter, status int, msg string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }

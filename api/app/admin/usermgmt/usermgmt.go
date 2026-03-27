@@ -14,7 +14,7 @@ type Module struct {
 	mw      *middleware.Middleware
 }
 
-func NewModule(h *handler.Handler, mw *middleware.Middleware) *Module {
+func newModule(h *handler.Handler, mw *middleware.Middleware) *Module {
 	return &Module{
 		handler: h,
 		mw:      mw,
@@ -28,6 +28,6 @@ func (m *Module) RegisterRoutes(mux *nethttp.ServeMux) {
 func Provide() fx.Option {
 	return fx.Options(
 		fx.Provide(handler.NewHandler),
-		fx.Provide(NewModule),
+		fx.Provide(newModule),
 	)
 }

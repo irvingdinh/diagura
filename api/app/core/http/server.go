@@ -59,10 +59,14 @@ func (s *serverImpl) start(_ context.Context) error {
 	}
 	mux.HandleFunc("GET /api", handleAPI)
 
+	var handler nethttp.Handler = mux
+	handler = MaxBytesReader(1 << 20)(handler)
+	handler = RequestLogger(handler)
+
 	addr := fmt.Sprintf("%s:%d", config.GetString("host"), config.GetInt("port"))
 	s.server = &nethttp.Server{
 		Addr:         addr,
-		Handler:      mux,
+		Handler:      handler,
 		ReadTimeout:  config.GetDuration("http.read_timeout"),
 		WriteTimeout: config.GetDuration("http.write_timeout"),
 		IdleTimeout:  config.GetDuration("http.idle_timeout"),

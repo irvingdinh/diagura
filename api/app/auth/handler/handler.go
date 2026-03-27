@@ -9,6 +9,7 @@ import (
 
 	"localhost/app/auth/service"
 	"localhost/app/core/config"
+	"localhost/app/core/http"
 )
 
 // Handler provides HTTP handlers for the authentication endpoints.
@@ -29,24 +30,24 @@ func (h *Handler) Login(w nethttp.ResponseWriter, r *nethttp.Request) {
 		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		writeError(w, nethttp.StatusBadRequest, "Invalid request body")
+		http.WriteError(w, nethttp.StatusBadRequest, "Invalid request body")
 		return
 	}
 	if input.Email == "" || input.Password == "" {
-		writeError(w, nethttp.StatusBadRequest, "Email and password are required")
+		http.WriteError(w, nethttp.StatusBadRequest, "Email and password are required")
 		return
 	}
 
 	user, err := h.svc.AuthenticateByEmail(r.Context(), input.Email, input.Password)
 	if err != nil {
-		writeError(w, nethttp.StatusUnauthorized, "Invalid email or password")
+		http.WriteError(w, nethttp.StatusUnauthorized, "Invalid email or password")
 		return
 	}
 
 	rawToken, err := h.svc.CreateSession(r.Context(), user.ID, clientIP(r), r.UserAgent())
 	if err != nil {
 		slog.ErrorContext(r.Context(), "failed to create session", "error", err)
-		writeError(w, nethttp.StatusInternalServerError, "Internal server error")
+		http.WriteError(w, nethttp.StatusInternalServerError, "Internal server error")
 		return
 	}
 
@@ -110,7 +111,7 @@ func (h *Handler) Logout(w nethttp.ResponseWriter, r *nethttp.Request) {
 		HttpOnly: true,
 		SameSite: nethttp.SameSiteLaxMode,
 		Secure:   config.GetBool("http.secure"),
-		MaxAge:   0,
+		MaxAge:   -1,
 	})
 
 	w.WriteHeader(nethttp.StatusNoContent)
@@ -131,10 +132,4 @@ func clientIP(r *nethttp.Request) string {
 		return r.RemoteAddr
 	}
 	return host
-}
-
-func writeError(w nethttp.ResponseWriter, status int, msg string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
