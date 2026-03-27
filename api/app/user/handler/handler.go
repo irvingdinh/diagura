@@ -6,10 +6,13 @@ import (
 	"strconv"
 	"time"
 
+	"localhost/app/auth/service"
 	"localhost/app/core/sqlite"
 	"localhost/app/core/sqlite/orm"
 	"localhost/app/user/entity"
 )
+
+const userRoleID = "00000000-0000-7000-0000-000000000002"
 
 type Handler struct {
 	db *sqlite.DB
@@ -23,8 +26,9 @@ func (h *Handler) List(w nethttp.ResponseWriter, r *nethttp.Request) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 
-	b := orm.Select("id", "email", "name", "created_at", "updated_at").
+	b := orm.Select("id", "role_id", "email", "name", "created_at", "updated_at").
 		From("users").
+		Where("deleted_at IS NULL").
 		OrderBy("created_at", "DESC")
 	if limit > 0 {
 		b = b.Limit(limit)
@@ -46,15 +50,22 @@ func (h *Handler) List(w nethttp.ResponseWriter, r *nethttp.Request) {
 
 func (h *Handler) Create(w nethttp.ResponseWriter, r *nethttp.Request) {
 	var input struct {
-		Email string `json:"email"`
-		Name  string `json:"name"`
+		Email    string `json:"email"`
+		Name     string `json:"name"`
+		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		nethttp.Error(w, "invalid request body", nethttp.StatusBadRequest)
 		return
 	}
-	if input.Email == "" {
-		nethttp.Error(w, "email is required", nethttp.StatusBadRequest)
+	if input.Email == "" || input.Password == "" {
+		nethttp.Error(w, "email and password are required", nethttp.StatusBadRequest)
+		return
+	}
+
+	passwordHash, err := service.HashPassword(input.Password)
+	if err != nil {
+		nethttp.Error(w, "internal server error", nethttp.StatusInternalServerError)
 		return
 	}
 
@@ -63,8 +74,10 @@ func (h *Handler) Create(w nethttp.ResponseWriter, r *nethttp.Request) {
 
 	query, args := orm.Insert("users").
 		Set("id", id).
+		Set("role_id", userRoleID).
 		Set("email", input.Email).
 		Set("name", input.Name).
+		Set("password_hash", passwordHash).
 		Set("created_at", now).
 		Set("updated_at", now).
 		Build()
@@ -74,13 +87,13 @@ func (h *Handler) Create(w nethttp.ResponseWriter, r *nethttp.Request) {
 		return
 	}
 
-	u := entity.User{
-		BaseModel: orm.BaseModel{ID: id},
-		Email:     input.Email,
-		Name:      input.Name,
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(nethttp.StatusCreated)
-	_ = json.NewEncoder(w).Encode(map[string]any{"data": u})
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"data": map[string]string{
+			"id":    id,
+			"email": input.Email,
+			"name":  input.Name,
+		},
+	})
 }

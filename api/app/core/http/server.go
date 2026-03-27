@@ -27,12 +27,14 @@ func NewServer(params struct {
 	config.SetDefaults(config.Values{
 		"host":               "127.0.0.1",
 		"port":               48310,
+		"http.secure":        false,
 		"http.read_timeout":  "5s",
 		"http.write_timeout": "10s",
 		"http.idle_timeout":  "120s",
 	})
 	config.SetRule("host", rule.Required)
 	config.SetRule("port", rule.Required, rule.Between(1, 65535))
+	config.SetRule("http.secure", rule.Required, rule.Boolean)
 	config.SetRule("http.read_timeout", rule.Required, rule.Duration)
 	config.SetRule("http.write_timeout", rule.Required, rule.Duration)
 	config.SetRule("http.idle_timeout", rule.Required, rule.Duration)

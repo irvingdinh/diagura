@@ -7,23 +7,26 @@ import (
 
 	"localhost/app/admin/handler"
 	"localhost/app/admin/usermgmt"
+	"localhost/app/auth/middleware"
 	"localhost/app/core/http"
 )
 
 type Module struct {
 	handler  *handler.Handler
 	usermgmt *usermgmt.Module
+	mw       *middleware.Middleware
 }
 
-func moduleImpl(h *handler.Handler, um *usermgmt.Module) *Module {
+func moduleImpl(h *handler.Handler, um *usermgmt.Module, mw *middleware.Middleware) *Module {
 	return &Module{
 		handler:  h,
 		usermgmt: um,
+		mw:       mw,
 	}
 }
 
 func (m *Module) RegisterRoutes(mux *nethttp.ServeMux) {
-	mux.HandleFunc("GET /api/admin/dashboard", m.handler.Dashboard)
+	mux.HandleFunc("GET /api/admin/dashboard", m.mw.RequireAdmin(m.handler.Dashboard))
 	m.usermgmt.RegisterRoutes(mux)
 }
 

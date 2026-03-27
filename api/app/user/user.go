@@ -5,23 +5,26 @@ import (
 
 	"go.uber.org/fx"
 
+	"localhost/app/auth/middleware"
 	"localhost/app/core/http"
 	"localhost/app/user/handler"
 )
 
 type Module struct {
 	handler *handler.Handler
+	mw      *middleware.Middleware
 }
 
-func moduleImpl(h *handler.Handler) *Module {
+func moduleImpl(h *handler.Handler, mw *middleware.Middleware) *Module {
 	return &Module{
 		handler: h,
+		mw:      mw,
 	}
 }
 
 func (m *Module) RegisterRoutes(mux *nethttp.ServeMux) {
-	mux.HandleFunc("GET /api/users", m.handler.List)
-	mux.HandleFunc("POST /api/users", m.handler.Create)
+	mux.HandleFunc("GET /api/users", m.mw.RequireAuth(m.handler.List))
+	mux.HandleFunc("POST /api/users", m.mw.RequireAuth(m.handler.Create))
 }
 
 func Provide() fx.Option {
