@@ -159,7 +159,7 @@ func (db *DB) open(ctx context.Context) error {
 	// Open write connection.
 	writeConn, err := db.openConn(driver.OpenReadWrite | driver.OpenCreate | driver.OpenNoMutex)
 	if err != nil {
-		return err
+		return fmt.Errorf("sqlite: open write connection: %w", err)
 	}
 
 	// Write-only PRAGMAs.
@@ -177,7 +177,7 @@ func (db *DB) open(ctx context.Context) error {
 		}
 		if _, err := engine.Up(ctx); err != nil {
 			_ = writeConn.Close()
-			return err
+			return fmt.Errorf("sqlite: run migrations: %w", err)
 		}
 	}
 
@@ -207,12 +207,12 @@ func (db *DB) open(ctx context.Context) error {
 func (db *DB) openConn(flags int) (*driver.Conn, error) {
 	conn, err := driver.Open(db.path, flags)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open %s: %w", db.path, err)
 	}
 
 	if err := conn.SetBusyTimeout(db.busyTimeout); err != nil {
 		_ = conn.Close()
-		return nil, err
+		return nil, fmt.Errorf("busy timeout: %w", err)
 	}
 
 	pragmas := []string{
@@ -226,7 +226,7 @@ func (db *DB) openConn(flags int) (*driver.Conn, error) {
 	for _, p := range pragmas {
 		if err := conn.Exec(p); err != nil {
 			_ = conn.Close()
-			return nil, fmt.Errorf("sqlite: %s: %w", p, err)
+			return nil, fmt.Errorf("%s: %w", p, err)
 		}
 	}
 

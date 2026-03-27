@@ -191,7 +191,7 @@ func (e *Engine) Status(_ context.Context) ([]MigrationStatus, error) {
 	for {
 		hasRow, err := stmt.Step()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("migration: status: %w", err)
 		}
 		if !hasRow {
 			break
@@ -233,7 +233,7 @@ func (e *Engine) appliedVersions() (map[int]bool, error) {
 	for {
 		hasRow, err := stmt.Step()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("migration: list applied: %w", err)
 		}
 		if !hasRow {
 			break
@@ -246,7 +246,7 @@ func (e *Engine) appliedVersions() (map[int]bool, error) {
 func (e *Engine) appliedOrdered() ([]int, error) {
 	stmt, err := e.conn.Prepare("SELECT version FROM _migrations ORDER BY version")
 	if err != nil {
-		return nil, fmt.Errorf("migration: list applied: %w", err)
+		return nil, fmt.Errorf("migration: list applied ordered: %w", err)
 	}
 	defer func() { _ = stmt.Finalize() }()
 
@@ -254,7 +254,7 @@ func (e *Engine) appliedOrdered() ([]int, error) {
 	for {
 		hasRow, err := stmt.Step()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("migration: list applied ordered: %w", err)
 		}
 		if !hasRow {
 			break
