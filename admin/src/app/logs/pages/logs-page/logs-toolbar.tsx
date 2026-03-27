@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import {
@@ -30,12 +30,16 @@ export const LogsToolbar = ({
 }) => {
   const [searchInput, setSearchInput] = useState(params.search ?? "");
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const paramsRef = useRef(params);
+  useEffect(() => {
+    paramsRef.current = params;
+  });
 
   const handleSearch = (value: string) => {
     setSearchInput(value);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      onChange({ ...params, search: value || undefined });
+      onChange({ ...paramsRef.current, search: value || undefined });
     }, 300);
   };
 

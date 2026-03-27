@@ -110,8 +110,9 @@ func (s *Store) List(ctx context.Context, f ListFilter) (*ListResult, error) {
 		countSelect = countSelect.Where("entity_id = ?", f.EntityID)
 	}
 	if f.Search != "" {
-		baseSelect = baseSelect.Where("data LIKE ?", "%"+f.Search+"%")
-		countSelect = countSelect.Where("data LIKE ?", "%"+f.Search+"%")
+		cond, pattern := orm.LikeCondition("data", f.Search)
+		baseSelect = baseSelect.Where(cond, "%"+pattern+"%")
+		countSelect = countSelect.Where(cond, "%"+pattern+"%")
 	}
 	if f.DateFrom != "" {
 		baseSelect = baseSelect.Where("created_at >= ?", f.DateFrom+" 00:00:00.000")
