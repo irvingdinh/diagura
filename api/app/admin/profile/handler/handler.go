@@ -73,10 +73,11 @@ func (h *Handler) Update(w nethttp.ResponseWriter, r *nethttp.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"data": map[string]any{
-			"id":    user.ID,
-			"email": user.Email,
-			"name":  input.Name,
-			"role":  user.RoleSlug,
+			"id":                    user.ID,
+			"email":                 user.Email,
+			"name":                  input.Name,
+			"role":                  user.RoleSlug,
+			"force_password_change": user.ForcePasswordChange,
 		},
 	})
 }

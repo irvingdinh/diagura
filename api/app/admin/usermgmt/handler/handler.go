@@ -291,6 +291,11 @@ func (h *Handler) SetPassword(w nethttp.ResponseWriter, r *nethttp.Request) {
 	actor, _ := authservice.UserFromContext(r.Context())
 	id := r.PathValue("id")
 
+	if id == actor.ID {
+		http.WriteError(w, nethttp.StatusBadRequest, "Use the profile endpoint to change your own password")
+		return
+	}
+
 	target, err := h.userSvc.GetByID(r.Context(), id)
 	if err != nil {
 		http.WriteError(w, nethttp.StatusNotFound, "User not found")

@@ -118,8 +118,8 @@ func (s *Store) List(ctx context.Context, f ListFilter) (*ListResult, error) {
 		countSelect = countSelect.Where("created_at >= ?", f.DateFrom+" 00:00:00.000")
 	}
 	if f.DateTo != "" {
-		baseSelect = baseSelect.Where("created_at < ?", f.DateTo+" 23:59:59.999")
-		countSelect = countSelect.Where("created_at < ?", f.DateTo+" 23:59:59.999")
+		baseSelect = baseSelect.Where("created_at <= ?", f.DateTo+" 23:59:59.999")
+		countSelect = countSelect.Where("created_at <= ?", f.DateTo+" 23:59:59.999")
 	}
 
 	countQuery, countArgs := countSelect.Build()
