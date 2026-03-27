@@ -1,4 +1,4 @@
-import { createContext, useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 
 type Theme = "dark" | "light" | "system";
 
@@ -8,26 +8,14 @@ type ThemeProviderProps = {
   storageKey?: string;
 };
 
-type ThemeProviderState = {
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
-};
-
-const initialState: ThemeProviderState = {
-  theme: "system",
-  setTheme: () => null,
-};
-
-const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
-
 export function ThemeProvider({
   children,
   defaultTheme = "system",
   storageKey = "diagura-admin-theme",
-  ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(
+  const theme = useMemo<Theme>(
     () => (localStorage.getItem(storageKey) as Theme) || defaultTheme,
+    [storageKey, defaultTheme],
   );
 
   useEffect(() => {
@@ -51,17 +39,5 @@ export function ThemeProvider({
     }
   }, [theme]);
 
-  const value = {
-    theme,
-    setTheme: (theme: Theme) => {
-      localStorage.setItem(storageKey, theme);
-      setTheme(theme);
-    },
-  };
-
-  return (
-    <ThemeProviderContext.Provider {...props} value={value}>
-      {children}
-    </ThemeProviderContext.Provider>
-  );
+  return <>{children}</>;
 }

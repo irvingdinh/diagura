@@ -61,11 +61,6 @@ func (m *Middleware) RequireRoles(next nethttp.HandlerFunc, roleSlugs ...string)
 	}
 }
 
-// RequireSuperAdmin returns middleware that allows only super_admin users.
-func (m *Middleware) RequireSuperAdmin(next nethttp.HandlerFunc) nethttp.HandlerFunc {
-	return m.RequireRoles(next, "super_admin")
-}
-
 // RequireAdmin returns middleware that allows super_admin and admin users.
 func (m *Middleware) RequireAdmin(next nethttp.HandlerFunc) nethttp.HandlerFunc {
 	return m.RequireRoles(next, "super_admin", "admin")

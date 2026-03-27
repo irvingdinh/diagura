@@ -26,23 +26,6 @@ func NewService(db *sqlite.DB) *Service {
 // Read operations
 // ---------------------------------------------------------------------------
 
-// List returns users with optional pagination.
-func (s *Service) List(ctx context.Context, limit, offset int) ([]entity.User, error) {
-	b := orm.Select("id", "role_id", "email", "name", "force_password_change", "created_at", "updated_at").
-		From("users").
-		Where("deleted_at IS NULL").
-		OrderBy("created_at", "DESC")
-	if limit > 0 {
-		b = b.Limit(limit)
-	}
-	if offset > 0 {
-		b = b.Offset(offset)
-	}
-	query, args := b.Build()
-
-	return orm.QueryAll[entity.User](s.db, query, args...)
-}
-
 // ListFilter holds filter and pagination parameters for ListPaginated.
 type ListFilter struct {
 	Search  string
@@ -59,7 +42,7 @@ type ListResult struct {
 }
 
 // ListPaginated returns a filtered, paginated list of users with role info.
-func (s *Service) ListPaginated(ctx context.Context, f ListFilter) (*ListResult, error) {
+func (s *Service) ListPaginated(_ context.Context, f ListFilter) (*ListResult, error) {
 	baseSelect := orm.Select(
 		"u.id", "u.email", "u.name", "u.force_password_change",
 		"u.deleted_at", "u.created_at", "u.updated_at",
@@ -119,7 +102,7 @@ func (s *Service) ListPaginated(ctx context.Context, f ListFilter) (*ListResult,
 }
 
 // GetByID returns a single user with role info.
-func (s *Service) GetByID(ctx context.Context, id string) (entity.UserWithRole, error) {
+func (s *Service) GetByID(_ context.Context, id string) (entity.UserWithRole, error) {
 	query, args := orm.Select(
 		"u.id", "u.email", "u.name", "u.force_password_change",
 		"u.deleted_at", "u.created_at", "u.updated_at",
@@ -138,7 +121,7 @@ func (s *Service) GetByID(ctx context.Context, id string) (entity.UserWithRole, 
 }
 
 // GetRoleBySlug returns a role by its slug.
-func (s *Service) GetRoleBySlug(ctx context.Context, slug string) (entity.Role, error) {
+func (s *Service) GetRoleBySlug(_ context.Context, slug string) (entity.Role, error) {
 	query, args := orm.Select("id", "slug", "name").
 		From("roles").
 		Where("slug = ?", slug).
@@ -153,7 +136,7 @@ func (s *Service) GetRoleBySlug(ctx context.Context, slug string) (entity.Role, 
 
 // EmailExists checks whether an active user with the given email exists,
 // optionally excluding a specific user ID (for update uniqueness checks).
-func (s *Service) EmailExists(ctx context.Context, email, excludeUserID string) (bool, error) {
+func (s *Service) EmailExists(_ context.Context, email, excludeUserID string) (bool, error) {
 	b := orm.Select("COUNT(*)").
 		From("users").
 		Where("email = ?", email).
@@ -190,7 +173,7 @@ type CreateResult struct {
 }
 
 // Create registers a new user with the specified role.
-func (s *Service) Create(ctx context.Context, input CreateInput) (*CreateResult, error) {
+func (s *Service) Create(_ context.Context, input CreateInput) (*CreateResult, error) {
 	passwordHash, err := authservice.HashPassword(input.Password)
 	if err != nil {
 		return nil, fmt.Errorf("hash password: %w", err)
@@ -222,7 +205,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*CreateResult,
 }
 
 // UpdateProfile updates a user's name (self-service).
-func (s *Service) UpdateProfile(ctx context.Context, userID, name string) error {
+func (s *Service) UpdateProfile(_ context.Context, userID, name string) error {
 	query, args := orm.Update("users").
 		Set("name", name).
 		Set("updated_at", utils.FormatTime(time.Now())).
@@ -242,7 +225,7 @@ type UpdateUserInput struct {
 }
 
 // UpdateUser applies partial updates to a user record.
-func (s *Service) UpdateUser(ctx context.Context, userID string, input UpdateUserInput) error {
+func (s *Service) UpdateUser(_ context.Context, userID string, input UpdateUserInput) error {
 	b := orm.Update("users")
 	if input.Name != nil {
 		b = b.Set("name", *input.Name)
@@ -264,7 +247,7 @@ func (s *Service) UpdateUser(ctx context.Context, userID string, input UpdateUse
 }
 
 // SetPassword updates a user's password hash and force_password_change flag.
-func (s *Service) SetPassword(ctx context.Context, userID, passwordHash string, forceChange bool) error {
+func (s *Service) SetPassword(_ context.Context, userID, passwordHash string, forceChange bool) error {
 	query, args := orm.Update("users").
 		Set("password_hash", passwordHash).
 		Set("force_password_change", forceChange).
@@ -278,7 +261,7 @@ func (s *Service) SetPassword(ctx context.Context, userID, passwordHash string, 
 }
 
 // SoftDelete marks a user as deleted by setting deleted_at.
-func (s *Service) SoftDelete(ctx context.Context, userID string) error {
+func (s *Service) SoftDelete(_ context.Context, userID string) error {
 	now := utils.FormatTime(time.Now())
 	query, args := orm.Update("users").
 		Set("deleted_at", now).
@@ -292,7 +275,7 @@ func (s *Service) SoftDelete(ctx context.Context, userID string) error {
 }
 
 // Restore clears deleted_at and sets force_password_change to true.
-func (s *Service) Restore(ctx context.Context, userID string) error {
+func (s *Service) Restore(_ context.Context, userID string) error {
 	now := utils.FormatTime(time.Now())
 	query, args := orm.Update("users").
 		Set("deleted_at", nil).

@@ -292,8 +292,3 @@ func (s *Stmt) ColumnBlob(i int) []byte {
 	copy(buf, unsafe.Slice((*byte)(src), int(n)))
 	return buf
 }
-
-// ColumnIsNull returns true if the i-th column is NULL.
-func (s *Stmt) ColumnIsNull(i int) bool {
-	return int(C._column_type(s.stmt, C.int(i))) == TypeNull
-}
