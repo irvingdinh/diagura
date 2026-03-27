@@ -130,7 +130,11 @@ func (s *Service) GetByID(ctx context.Context, id string) (entity.UserWithRole, 
 		Where("u.id = ?", id).
 		Build()
 
-	return orm.QueryOne[entity.UserWithRole](s.db, query, args...)
+	user, err := orm.QueryOne[entity.UserWithRole](s.db, query, args...)
+	if err != nil {
+		return user, fmt.Errorf("get user by id: %w", err)
+	}
+	return user, nil
 }
 
 // GetRoleBySlug returns a role by its slug.
@@ -140,7 +144,11 @@ func (s *Service) GetRoleBySlug(ctx context.Context, slug string) (entity.Role, 
 		Where("slug = ?", slug).
 		Build()
 
-	return orm.QueryOne[entity.Role](s.db, query, args...)
+	role, err := orm.QueryOne[entity.Role](s.db, query, args...)
+	if err != nil {
+		return role, fmt.Errorf("get role by slug: %w", err)
+	}
+	return role, nil
 }
 
 // EmailExists checks whether an active user with the given email exists,
