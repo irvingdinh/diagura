@@ -70,7 +70,7 @@ func (m *Middleware) RequireAdmin(next nethttp.HandlerFunc) nethttp.HandlerFunc 
 // user/session context values. Returns the enriched request, the user, and
 // whether authentication succeeded. On failure it writes the 401 response.
 func (m *Middleware) authenticate(w nethttp.ResponseWriter, r *nethttp.Request) (*nethttp.Request, *service.AuthUser, bool) {
-	cookie, err := r.Cookie("standalone_session")
+	cookie, err := r.Cookie(service.CookieName)
 	if err != nil {
 		http.WriteError(w, nethttp.StatusUnauthorized, "Unauthorized")
 		return r, nil, false

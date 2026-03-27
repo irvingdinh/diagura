@@ -53,7 +53,7 @@ func (h *Handler) Login(w nethttp.ResponseWriter, r *nethttp.Request) {
 	}
 
 	nethttp.SetCookie(w, &nethttp.Cookie{
-		Name:     "standalone_session",
+		Name:     service.CookieName,
 		Value:    rawToken,
 		Path:     "/",
 		HttpOnly: true,
@@ -119,7 +119,7 @@ func (h *Handler) Logout(w nethttp.ResponseWriter, r *nethttp.Request) {
 	})
 
 	nethttp.SetCookie(w, &nethttp.Cookie{
-		Name:     "standalone_session",
+		Name:     service.CookieName,
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,

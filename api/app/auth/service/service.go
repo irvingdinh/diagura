@@ -15,6 +15,9 @@ import (
 )
 
 const (
+	// CookieName is the session cookie name, shared by auth handler and middleware.
+	CookieName = "standalone_session"
+
 	sessionSlidingDays  = 30
 	sessionAbsoluteDays = 365
 )
