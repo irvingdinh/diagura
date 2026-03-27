@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port 48305",
     "build": "tsc -b && vite build",
-    "lint": "eslint . && prettier --check .",
-    "lint:fix": "eslint . --fix && prettier --write .",
+    "lint": "eslint . && prettier --check --log-level warn .",
+    "lint:fix": "eslint . --fix && prettier --write --log-level warn .",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -2,6 +2,7 @@ package log
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -71,10 +72,14 @@ func (w *dailyFileWriter) Write(p []byte) (int, error) {
 
 func (w *dailyFileWriter) rotate(date string) error {
 	if w.buf != nil {
-		_ = w.buf.Flush()
+		if err := w.buf.Flush(); err != nil {
+			fmt.Fprintf(os.Stderr, "log: flush before rotation: %v\n", err)
+		}
 	}
 	if w.file != nil {
-		_ = w.file.Close()
+		if err := w.file.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "log: close before rotation: %v\n", err)
+		}
 	}
 	path := filepath.Join(w.dir, date+".log")
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
@@ -109,15 +114,22 @@ func (w *dailyFileWriter) Close() error {
 		close(w.done)
 	}
 
+	var errs []error
 	if w.buf != nil {
-		_ = w.buf.Flush()
+		if err := w.buf.Flush(); err != nil {
+			errs = append(errs, err)
+		}
 		w.buf = nil
 	}
 	if w.file != nil {
-		err := w.file.Close()
+		if err := w.file.Sync(); err != nil {
+			errs = append(errs, err)
+		}
+		if err := w.file.Close(); err != nil {
+			errs = append(errs, err)
+		}
 		w.file = nil
 		w.date = ""
-		return err
 	}
-	return nil
+	return errors.Join(errs...)
 }

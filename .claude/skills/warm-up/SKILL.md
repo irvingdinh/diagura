@@ -17,7 +17,9 @@ Execute in order. Maximize parallelism where noted.
 These go into YOUR context directly — you need them for all downstream work:
 
 1. **Read `Makefile`** — defined workflows. Use these; do not invent commands.
-2. **Load the `go-best-practices`, `diagura-go-best-practices` skill** — always, regardless of the task.
+2. **Load these following skills** — always, regardless of the task:
+   - `go-best-practices`, `diagura-go-best-practices`
+   - `frontend-design`, `vercel-react-best-practices`
 
 ### Step 2 — Explore the codebase (parallel subagents)
 

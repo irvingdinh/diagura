@@ -62,6 +62,7 @@ var Uppercase = wrap(validator.Uppercase)
 func MinLength(n int) config.Rule            { return wrap(validator.MinLength(n)) }
 func MaxLength(n int) config.Rule            { return wrap(validator.MaxLength(n)) }
 func In(allowed ...string) config.Rule       { return wrap(validator.In(allowed...)) }
+func InFold(allowed ...string) config.Rule   { return wrap(validator.InFold(allowed...)) }
 func NotIn(disallowed ...string) config.Rule { return wrap(validator.NotIn(disallowed...)) }
 func Regex(pattern string) config.Rule       { return wrap(validator.Regex(pattern)) }
 func StartsWith(prefix string) config.Rule   { return wrap(validator.StartsWith(prefix)) }

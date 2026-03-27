@@ -170,6 +170,21 @@ func In(allowed ...string) Rule {
 	}
 }
 
+// InFold ensures the string value is one of the allowed values. Case-insensitive.
+//
+//	validator.InFold("debug", "info", "warn", "error")
+func InFold(allowed ...string) Rule {
+	return func(value any) error {
+		s := asString(value)
+		for _, a := range allowed {
+			if strings.EqualFold(s, a) {
+				return nil
+			}
+		}
+		return fmt.Errorf("must be one of [%s], got %q", strings.Join(allowed, ", "), s)
+	}
+}
+
 // NotIn ensures the string value is none of the disallowed values. Case-sensitive.
 func NotIn(disallowed ...string) Rule {
 	return func(value any) error {

@@ -12,6 +12,7 @@ import (
 	"go.uber.org/fx/fxevent"
 
 	"localhost/app/core/config"
+	"localhost/app/core/config/rule"
 )
 
 type state struct {
@@ -40,36 +41,15 @@ func Load() {
 		"log.format": "json",
 	})
 
-	config.SetRule("log.level", func(key string, value any, exists bool) error {
-		if !exists {
-			return nil
-		}
-		switch strings.ToLower(strings.TrimSpace(fmt.Sprint(value))) {
-		case "debug", "info", "warn", "warning", "error":
-			return nil
-		default:
-			return fmt.Errorf("config: %s must be one of debug, info, warn, error; got %q", key, value)
-		}
-	})
-
-	config.SetRule("log.format", func(key string, value any, exists bool) error {
-		if !exists {
-			return nil
-		}
-		switch strings.ToLower(strings.TrimSpace(fmt.Sprint(value))) {
-		case "text", "json":
-			return nil
-		default:
-			return fmt.Errorf("config: %s must be \"text\" or \"json\"; got %q", key, value)
-		}
-	})
+	config.SetRule("log.level", rule.InFold("debug", "info", "warn", "warning", "error"))
+	config.SetRule("log.format", rule.InFold("text", "json"))
 
 	var level slog.LevelVar
-	if err := parseLevel(&level, config.GetStringOr("log.level", "info")); err != nil {
+	if err := parseLevel(&level, config.GetString("log.level")); err != nil {
 		panic(fmt.Sprintf("log: %v", err))
 	}
 
-	consoleHandler := consoleHandler(config.GetStringOr("log.format", "json"), &level)
+	consoleHandler := consoleHandler(config.GetString("log.format"), &level)
 
 	logsDir := filepath.Join(config.GetString("data_dir"), "logs")
 	if err := os.MkdirAll(logsDir, 0o755); err != nil {
