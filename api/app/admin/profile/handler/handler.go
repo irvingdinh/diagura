@@ -115,6 +115,9 @@ func (h *Handler) ChangePassword(w nethttp.ResponseWriter, r *nethttp.Request) {
 	h.bus.Emit(r.Context(), userevent.UserPasswordChanged{
 		UserID: user.ID,
 	})
+	h.bus.Emit(r.Context(), authevent.SessionInvalidatedAll{
+		UserID: user.ID,
+	})
 
 	w.WriteHeader(nethttp.StatusNoContent)
 }

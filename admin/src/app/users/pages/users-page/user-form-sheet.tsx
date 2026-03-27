@@ -213,7 +213,7 @@ const UserForm = ({
               value={selectedRole}
               onValueChange={(v) => setValue("role", v)}
             >
-              <SelectTrigger aria-invalid={!!errors.role}>
+              <SelectTrigger>
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
               <SelectContent>
@@ -224,7 +224,6 @@ const UserForm = ({
                 ))}
               </SelectContent>
             </Select>
-            <FieldError errors={[errors.role]} />
           </Field>
           <FieldError errors={[errors.root]} />
         </FieldGroup>
