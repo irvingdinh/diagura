@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import type { ComponentProps } from "react";
 import { useForm } from "react-hook-form";
@@ -19,6 +19,8 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { queryKeys } from "@/lib/query-keys";
+import type { ApiResponse, SessionUser } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface LoginFormValues {
@@ -26,7 +28,9 @@ interface LoginFormValues {
   password: string;
 }
 
-async function login(values: LoginFormValues) {
+async function login(
+  values: LoginFormValues,
+): Promise<ApiResponse<SessionUser>> {
   const res = await fetch("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -43,6 +47,7 @@ async function login(values: LoginFormValues) {
 
 export const LoginForm = ({ className, ...props }: ComponentProps<"div">) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const {
     register,
@@ -53,7 +58,15 @@ export const LoginForm = ({ className, ...props }: ComponentProps<"div">) => {
 
   const mutation = useMutation({
     mutationFn: login,
-    onSuccess: () => navigate("/admin"),
+    onSuccess: (response) => {
+      queryClient.setQueryData(queryKeys.session, response.data);
+
+      if (response.data.force_password_change) {
+        navigate("/admin/profile");
+      } else {
+        navigate("/admin");
+      }
+    },
     onError: (error: Error) => {
       setError("root", { message: error.message });
     },
@@ -93,12 +106,6 @@ export const LoginForm = ({ className, ...props }: ComponentProps<"div">) => {
               <Field>
                 <div className="flex items-center">
                   <FieldLabel htmlFor="password">Password</FieldLabel>
-                  <a
-                    href="#"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
-                  >
-                    Forgot your password?
-                  </a>
                 </div>
                 <Input
                   id="password"
