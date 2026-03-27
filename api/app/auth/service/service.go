@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,6 +14,11 @@ import (
 	"localhost/app/core/sqlite/orm"
 	"localhost/app/core/utils"
 )
+
+// ErrInvalidCredentials is returned when authentication fails due to a wrong
+// email or password. Callers can use errors.Is to distinguish credential
+// failures from system errors.
+var ErrInvalidCredentials = errors.New("invalid credentials")
 
 const (
 	// CookieName is the session cookie name, shared by auth handler and middleware.
@@ -185,12 +191,18 @@ func (s *Service) AuthenticateByEmail(ctx context.Context, email, password strin
 
 	row, err := orm.QueryOne[userRow](s.db, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("invalid credentials")
+		if errors.Is(err, orm.ErrNotFound) {
+			return nil, ErrInvalidCredentials
+		}
+		return nil, fmt.Errorf("query user: %w", err)
 	}
 
 	ok, err := VerifyPassword(row.PasswordHash, password)
-	if err != nil || !ok {
-		return nil, fmt.Errorf("invalid credentials")
+	if err != nil {
+		return nil, fmt.Errorf("verify password: %w", err)
+	}
+	if !ok {
+		return nil, ErrInvalidCredentials
 	}
 
 	if NeedsRehash(row.PasswordHash) {

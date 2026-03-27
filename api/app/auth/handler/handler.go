@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	nethttp "net/http"
 
@@ -41,7 +42,12 @@ func (h *Handler) Login(w nethttp.ResponseWriter, r *nethttp.Request) {
 
 	user, err := h.svc.AuthenticateByEmail(r.Context(), input.Email, input.Password)
 	if err != nil {
-		http.WriteError(w, nethttp.StatusUnauthorized, "Invalid email or password")
+		if errors.Is(err, service.ErrInvalidCredentials) {
+			http.WriteError(w, nethttp.StatusUnauthorized, "Invalid email or password")
+			return
+		}
+		slog.ErrorContext(r.Context(), "failed to authenticate", "error", err)
+		http.WriteError(w, nethttp.StatusInternalServerError, "Internal server error")
 		return
 	}
 

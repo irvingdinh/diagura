@@ -26,7 +26,10 @@ func NewService(userSvc *userservice.Service, authSvc *authservice.Service) *Ser
 // and invalidates all other sessions.
 func (s *Service) ChangePassword(ctx context.Context, email, currentPassword, newPassword, userID, keepSessionID string) error {
 	if _, err := s.authSvc.AuthenticateByEmail(ctx, email, currentPassword); err != nil {
-		return ErrIncorrectPassword
+		if errors.Is(err, authservice.ErrInvalidCredentials) {
+			return ErrIncorrectPassword
+		}
+		return fmt.Errorf("authenticate: %w", err)
 	}
 
 	hash, err := authservice.HashPassword(newPassword)
