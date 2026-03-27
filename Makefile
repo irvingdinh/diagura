@@ -17,7 +17,5 @@ run-ui: kill-ui
 	@cd admin && bun dev
 
 lint:
-	@cd api && golangci-lint run --fix ./...
-
-lint-ui:
 	@cd admin && bun run lint:fix
+	@cd api && golangci-lint run --fix ./...
