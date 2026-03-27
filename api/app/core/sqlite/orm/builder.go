@@ -332,10 +332,10 @@ func (b *DeleteBuilder) Build() (string, []any) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-// EscapeLike escapes special characters in a LIKE pattern.
+// escapeLike escapes special characters in a LIKE pattern.
 // The caller must include ESCAPE '\' in the SQL clause for the
-// escaping to take effect. Prefer LikeCondition for a safer API.
-func EscapeLike(s string) string {
+// escaping to take effect.
+func escapeLike(s string) string {
 	s = strings.ReplaceAll(s, "\\", "\\\\")
 	s = strings.ReplaceAll(s, "%", "\\%")
 	s = strings.ReplaceAll(s, "_", "\\_")
@@ -350,5 +350,5 @@ func EscapeLike(s string) string {
 //	cond, pattern := orm.LikeCondition("name", userInput)
 //	builder.Where(cond, "%"+pattern+"%")
 func LikeCondition(column, pattern string) (cond string, escapedPattern string) {
-	return fmt.Sprintf("%s LIKE ? ESCAPE '\\'", column), EscapeLike(pattern)
+	return fmt.Sprintf("%s LIKE ? ESCAPE '\\'", column), escapeLike(pattern)
 }
