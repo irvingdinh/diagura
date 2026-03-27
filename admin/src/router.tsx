@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { createBrowserRouter, Outlet } from "react-router";
+import { createBrowserRouter, Navigate, Outlet } from "react-router";
 
 import { AppLayout } from "@/app/dashboard/components/app-layout";
 
@@ -14,7 +14,16 @@ function lazy(factory: () => Promise<Record<string, ComponentType>>) {
 
 export const router = createBrowserRouter([
   {
+    path: "/admin/login",
+    hydrateFallbackElement: null,
+    ...lazy(() => import("@/app/auth/pages/login-page")),
+  },
+  {
     path: "/",
+    Component: () => <Navigate to="/admin" replace />,
+  },
+  {
+    path: "/admin",
     hydrateFallbackElement: null,
     Component: () => (
       <AppLayout>
