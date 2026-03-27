@@ -1,1 +1,1 @@
-export { LoginPage as default } from "./login-page.tsx";
+export { LoginPage as default } from "./login-page";

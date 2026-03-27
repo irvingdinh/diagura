@@ -10,7 +10,7 @@ import {
 import type { ComponentProps } from "react";
 import { Link, useLocation } from "react-router";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar.tsx";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,7 +18,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu.tsx";
+} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -31,9 +31,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-} from "@/components/ui/sidebar.tsx";
-import { logout } from "@/lib/api.ts";
-import type { SessionUser } from "@/lib/types.ts";
+} from "@/components/ui/sidebar";
+import { logout } from "@/lib/api";
+import type { SessionUser } from "@/lib/types";
 
 function initials(name: string): string {
   return name

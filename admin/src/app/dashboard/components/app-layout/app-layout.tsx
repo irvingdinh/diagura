@@ -1,14 +1,14 @@
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router";
 
-import { AppSidebar } from "@/app/dashboard/components/app-layout/app-sidebar.tsx";
+import { AppSidebar } from "@/app/dashboard/components/app-layout/app-sidebar";
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
-} from "@/components/ui/sidebar.tsx";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { useSession } from "@/hooks/use-session.ts";
+} from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useSession } from "@/hooks/use-session";
 
 export const AppLayout = ({ children }: { children: ReactNode }) => {
   const session = useSession();
