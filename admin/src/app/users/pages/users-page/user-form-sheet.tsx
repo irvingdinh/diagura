@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -127,6 +127,7 @@ const UserForm = ({
     handleSubmit,
     setValue,
     setError,
+    control,
     formState: { errors },
   } = useForm<FormValues>({ defaultValues });
 
@@ -153,7 +154,8 @@ const UserForm = ({
     },
   });
 
-  const selectedRole = defaultValues.role ?? roles[roles.length - 1].value;
+  const selectedRole =
+    useWatch({ control, name: "role" }) ?? roles[roles.length - 1].value;
 
   return (
     <form

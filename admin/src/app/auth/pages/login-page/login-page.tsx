@@ -1,4 +1,4 @@
-import { LoginForm } from "@/app/auth/pages/login-page/login-form";
+import { LoginForm } from "./login-form";
 
 export const LoginPage = () => {
   return (

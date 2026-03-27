@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -56,7 +57,7 @@ func (s *Service) AvailableDates() ([]string, error) {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("logmgmt: read log directory: %w", err)
 	}
 
 	var dates []time.Time
@@ -92,7 +93,7 @@ func (s *Service) ListEntries(_ context.Context, filter ListFilter) (*ListResult
 		if os.IsNotExist(err) {
 			return &ListResult{}, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("logmgmt: open log file %s: %w", dateFile, err)
 	}
 	defer func() { _ = f.Close() }()
 
@@ -134,7 +135,7 @@ func (s *Service) ListEntries(_ context.Context, filter ListFilter) (*ListResult
 
 	start := (filter.Page - 1) * filter.PerPage
 	if start >= total {
-		return &ListResult{Total: total}, nil
+		return &ListResult{Entries: []map[string]any{}, Total: total}, nil
 	}
 	end := start + filter.PerPage
 	if end > total {
