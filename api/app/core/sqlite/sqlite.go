@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"container/list"
 	"context"
 	"errors"
 	"fmt"
@@ -32,43 +33,71 @@ type Result struct {
 	RowsAffected int64
 }
 
-// cachedConn wraps a driver.Conn with a prepared statement cache.
+const stmtCacheCapacity = 256
+
+type cacheEntry struct {
+	sql  string
+	stmt *driver.Stmt
+}
+
+// cachedConn wraps a driver.Conn with an LRU prepared statement cache.
 type cachedConn struct {
 	conn  *driver.Conn
-	cache map[string]*driver.Stmt
+	ll    *list.List
+	index map[string]*list.Element
 }
 
 func newCachedConn(conn *driver.Conn) *cachedConn {
-	return &cachedConn{conn: conn, cache: make(map[string]*driver.Stmt)}
+	return &cachedConn{
+		conn:  conn,
+		ll:    list.New(),
+		index: make(map[string]*list.Element, stmtCacheCapacity),
+	}
 }
 
 // prepare returns a cached statement or prepares a new one.
+// On cache hit, the statement is moved to the front of the LRU list.
+// When the cache is at capacity, the least recently used statement is evicted.
 func (cc *cachedConn) prepare(sql string) (*driver.Stmt, error) {
-	if stmt, ok := cc.cache[sql]; ok {
-		if err := stmt.Reset(); err == nil {
-			if err := stmt.ClearBindings(); err == nil {
-				return stmt, nil
+	if el, ok := cc.index[sql]; ok {
+		entry := el.Value.(*cacheEntry)
+		if err := entry.stmt.Reset(); err == nil {
+			if err := entry.stmt.ClearBindings(); err == nil {
+				cc.ll.MoveToFront(el)
+				return entry.stmt, nil
 			}
 		}
 		// Reset or ClearBindings failed; discard and re-prepare.
-		delete(cc.cache, sql)
-		_ = stmt.Finalize()
+		cc.ll.Remove(el)
+		delete(cc.index, sql)
+		_ = entry.stmt.Finalize()
+	}
+
+	if cc.ll.Len() >= stmtCacheCapacity {
+		back := cc.ll.Back()
+		evicted := back.Value.(*cacheEntry)
+		cc.ll.Remove(back)
+		delete(cc.index, evicted.sql)
+		_ = evicted.stmt.Finalize()
 	}
 
 	stmt, err := cc.conn.Prepare(sql)
 	if err != nil {
 		return nil, err
 	}
-	cc.cache[sql] = stmt
+
+	el := cc.ll.PushFront(&cacheEntry{sql: sql, stmt: stmt})
+	cc.index[sql] = el
 	return stmt, nil
 }
 
 // close finalizes all cached statements and closes the connection.
 func (cc *cachedConn) close() error {
-	for _, stmt := range cc.cache {
-		_ = stmt.Finalize()
+	for el := cc.ll.Front(); el != nil; el = el.Next() {
+		_ = el.Value.(*cacheEntry).stmt.Finalize()
 	}
-	cc.cache = nil
+	cc.ll = nil
+	cc.index = nil
 	return cc.conn.Close()
 }
 
@@ -555,12 +584,17 @@ type Tx struct {
 }
 
 // Commit commits the transaction and releases the write mutex.
+// If COMMIT fails, a ROLLBACK is attempted before releasing the mutex
+// to prevent leaving the write connection with an abandoned transaction.
 func (tx *Tx) Commit() error {
 	if tx.finished {
 		return fmt.Errorf("sqlite: transaction already finished")
 	}
 	tx.finished = true
 	err := tx.execLocked("COMMIT")
+	if err != nil {
+		_ = tx.execLocked("ROLLBACK")
+	}
 	tx.db.mu.Unlock()
 	if err != nil {
 		return fmt.Errorf("sqlite: commit: %w", err)

@@ -2,9 +2,8 @@ package orm
 
 import (
 	"crypto/rand"
-	"encoding/binary"
 	"errors"
-	"sync/atomic"
+	"sync"
 	"time"
 )
 
@@ -29,49 +28,108 @@ func NewBaseModel() BaseModel {
 	}
 }
 
-// NewID generates a unique, time-sortable 20-character alphanumeric
-// identifier. Format: 8 chars timestamp (base32, 40-bit) + 12 chars random.
-// The timestamp component wraps every ~34.8 years; see generateID.
-func NewID() string {
-	return generateID(time.Now())
+// hextable maps each byte 0x00-0xFF to two lowercase hex characters
+// packed into a uint16 (low byte = first char, high byte = second char).
+var hextable [256]uint16
+
+func init() {
+	const digits = "0123456789abcdef"
+	for i := range hextable {
+		hextable[i] = uint16(digits[i>>4]) | uint16(digits[i&0x0f])<<8
+	}
 }
 
-const alphabet = "0123456789abcdefghjkmnpqrstvwxyz"
+// uuidState holds the monotonic counter state for UUIDv7 generation
+// (RFC 9562 Method 1).
+var uuidState struct {
+	sync.Mutex
+	lastMS  int64
+	counter uint16
+}
 
-var idCounter atomic.Uint64
+// NewID generates a UUIDv7 identifier (RFC 9562) in standard 36-character
+// format: xxxxxxxx-xxxx-7xxx-yxxx-xxxxxxxxxxxx.
+//
+// IDs are time-sortable with monotonic ordering within the same millisecond.
+func NewID() string {
+	return generateUUIDv7(time.Now())
+}
 
-// generateID produces a 20-character ID: 8 base32 chars for the timestamp
-// (lower 40 bits of millisecond precision) + 12 base32 chars of randomness.
-// The 40-bit timestamp wraps every ~34.8 years. Since current Unix
-// milliseconds exceed 40 bits, the upper bits are truncated. IDs remain
-// time-sortable within any ~34.8-year window (next wrap ~2039).
-func generateID(now time.Time) string {
-	var buf [20]byte
+// generateUUIDv7 produces a UUIDv7 string for the given timestamp.
+func generateUUIDv7(now time.Time) string {
+	ms := now.UnixMilli()
 
-	ms := uint64(now.UnixMilli())
-	for i := 7; i >= 0; i-- {
-		buf[i] = alphabet[ms&0x1f]
-		ms >>= 5
-	}
-
-	var randomBytes [8]byte
-	_, _ = rand.Read(randomBytes[:])
-
-	counter := idCounter.Add(1)
-	binary.LittleEndian.PutUint64(randomBytes[:], binary.LittleEndian.Uint64(randomBytes[:])+counter)
-
-	for i := 0; i < 12; i++ {
-		byteIdx := (i * 5) / 8
-		bitOffset := uint((i * 5) % 8)
-
-		var val uint16
-		if byteIdx+1 < len(randomBytes) {
-			val = uint16(randomBytes[byteIdx]) | uint16(randomBytes[byteIdx+1])<<8
-		} else {
-			val = uint16(randomBytes[byteIdx])
+	uuidState.Lock()
+	if ms <= uuidState.lastMS {
+		// Clock standstill or regression: reuse last timestamp, bump counter.
+		ms = uuidState.lastMS
+		uuidState.counter++
+		if uuidState.counter > 0x0FFF {
+			// Counter overflow: advance timestamp by 1 ms to stay monotonic.
+			ms++
+			uuidState.lastMS = ms
+			var seed [2]byte
+			_, _ = rand.Read(seed[:])
+			uuidState.counter = (uint16(seed[0])<<8 | uint16(seed[1])) & 0x01FF
 		}
-		buf[8+i] = alphabet[(val>>bitOffset)&0x1f]
+	} else {
+		// New millisecond: seed counter from random with headroom.
+		uuidState.lastMS = ms
+		var seed [2]byte
+		_, _ = rand.Read(seed[:])
+		uuidState.counter = (uint16(seed[0])<<8 | uint16(seed[1])) & 0x01FF
 	}
+	counter := uuidState.counter
+	uuidState.Unlock()
+
+	var u [16]byte
+
+	// Bytes 0-5: 48-bit Unix timestamp in milliseconds, big-endian.
+	u[0] = byte(ms >> 40)
+	u[1] = byte(ms >> 32)
+	u[2] = byte(ms >> 24)
+	u[3] = byte(ms >> 16)
+	u[4] = byte(ms >> 8)
+	u[5] = byte(ms)
+
+	// Bytes 6-7: version 7 in high nibble, counter in low 12 bits.
+	u[6] = 0x70 | byte(counter>>8)&0x0F
+	u[7] = byte(counter)
+
+	// Bytes 8-15: random data.
+	_, _ = rand.Read(u[8:])
+
+	// Byte 8: set variant bits to 10xxxxxx.
+	u[8] = (u[8] & 0x3F) | 0x80
+
+	// Encode to 36-char hex string with dashes: 8-4-4-4-12.
+	var buf [36]byte
+	putHex := func(p int, b byte) {
+		h := hextable[b]
+		buf[p] = byte(h)
+		buf[p+1] = byte(h >> 8)
+	}
+
+	putHex(0, u[0])
+	putHex(2, u[1])
+	putHex(4, u[2])
+	putHex(6, u[3])
+	buf[8] = '-'
+	putHex(9, u[4])
+	putHex(11, u[5])
+	buf[13] = '-'
+	putHex(14, u[6])
+	putHex(16, u[7])
+	buf[18] = '-'
+	putHex(19, u[8])
+	putHex(21, u[9])
+	buf[23] = '-'
+	putHex(24, u[10])
+	putHex(26, u[11])
+	putHex(28, u[12])
+	putHex(30, u[13])
+	putHex(32, u[14])
+	putHex(34, u[15])
 
 	return string(buf[:])
 }

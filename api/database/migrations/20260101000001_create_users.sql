@@ -1,4 +1,4 @@
--- +diagura Up
+-- +migration Up
 CREATE TABLE users (
     id         TEXT PRIMARY KEY,
     email      TEXT NOT NULL UNIQUE,
@@ -7,5 +7,5 @@ CREATE TABLE users (
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- +diagura Down
+-- +migration Down
 DROP TABLE IF EXISTS users;

@@ -7,10 +7,10 @@ import (
 )
 
 const (
-	annotationUp             = "-- +diagura Up"
-	annotationDown           = "-- +diagura Down"
-	annotationStatementBegin = "-- +diagura StatementBegin"
-	annotationStatementEnd   = "-- +diagura StatementEnd"
+	annotationUp             = "-- +migration Up"
+	annotationDown           = "-- +migration Down"
+	annotationStatementBegin = "-- +migration StatementBegin"
+	annotationStatementEnd   = "-- +migration StatementEnd"
 )
 
 type parsedMigration struct {
@@ -76,22 +76,28 @@ func parse(r io.Reader) (parsedMigration, error) {
 			continue
 		}
 
-		// Split on semicolons outside StatementBegin blocks.
-		for {
-			idx := strings.Index(line, ";")
-			if idx < 0 {
+		// Split on semicolons outside single-quoted strings.
+		inQuote := false
+		start := 0
+		for i := 0; i < len(line); i++ {
+			ch := line[i]
+			if ch == '\'' {
+				inQuote = !inQuote
+			} else if ch == ';' && !inQuote {
 				if buf.Len() > 0 {
 					buf.WriteByte('\n')
 				}
-				buf.WriteString(line)
-				break
+				buf.WriteString(line[start:i])
+				flush()
+				start = i + 1
 			}
+		}
+		remaining := line[start:]
+		if len(remaining) > 0 {
 			if buf.Len() > 0 {
 				buf.WriteByte('\n')
 			}
-			buf.WriteString(line[:idx])
-			flush()
-			line = line[idx+1:]
+			buf.WriteString(remaining)
 		}
 	}
 	flush()
