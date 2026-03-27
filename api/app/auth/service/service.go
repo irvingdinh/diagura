@@ -221,9 +221,9 @@ func (s *Service) CreateSession(ctx context.Context, userID, ipAddress, userAgen
 	tokenHash := HashToken(rawToken)
 
 	now := time.Now().UTC()
-	nowStr := orm.FormatTime(now)
-	expiresAt := orm.FormatTime(now.Add(sessionSlidingDays * 24 * time.Hour))
-	absoluteExpiresAt := orm.FormatTime(now.Add(sessionAbsoluteDays * 24 * time.Hour))
+	nowStr := utils.FormatTime(now)
+	expiresAt := utils.FormatTime(now.Add(sessionSlidingDays * 24 * time.Hour))
+	absoluteExpiresAt := utils.FormatTime(now.Add(sessionAbsoluteDays * 24 * time.Hour))
 
 	query, args := orm.Insert("sessions").
 		Set("id", orm.NewID()).
@@ -280,8 +280,8 @@ func (s *Service) DeleteAllUserSessions(ctx context.Context, userID string) erro
 func (s *Service) ExtendSession(ctx context.Context, sessionID string) error {
 	now := time.Now().UTC()
 	query, args := orm.Update("sessions").
-		Set("expires_at", orm.FormatTime(now.Add(sessionSlidingDays*24*time.Hour))).
-		Set("updated_at", orm.FormatTime(now)).
+		Set("expires_at", utils.FormatTime(now.Add(sessionSlidingDays*24*time.Hour))).
+		Set("updated_at", utils.FormatTime(now)).
 		Where("id = ?", sessionID).
 		Build()
 
