@@ -4,7 +4,12 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
-import type { ApiListResponse, EventEntry, EventListParams } from "@/lib/types";
+import type {
+  ApiListResponse,
+  ApiResponse,
+  EventEntry,
+  EventListParams,
+} from "@/lib/types";
 
 import { EventsTable } from "./events-table";
 import { EventsToolbar } from "./events-toolbar";
@@ -17,7 +22,7 @@ export const EventsPage = () => {
 
   const namesQuery = useQuery({
     queryKey: queryKeys.events.names,
-    queryFn: () => api<{ data: string[] }>("/api/admin/events/names"),
+    queryFn: () => api<ApiResponse<string[]>>("/api/admin/events/names"),
     staleTime: 60 * 1000,
   });
 

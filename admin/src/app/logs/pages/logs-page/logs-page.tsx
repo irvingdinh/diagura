@@ -4,7 +4,12 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
-import type { ApiListResponse, LogEntry, LogListParams } from "@/lib/types";
+import type {
+  ApiListResponse,
+  ApiResponse,
+  LogEntry,
+  LogListParams,
+} from "@/lib/types";
 
 import { LogsTable } from "./logs-table";
 import { LogsToolbar } from "./logs-toolbar";
@@ -18,7 +23,7 @@ export const LogsPage = () => {
 
   const datesQuery = useQuery({
     queryKey: queryKeys.logs.dates,
-    queryFn: () => api<{ data: string[] }>("/api/admin/logs/dates"),
+    queryFn: () => api<ApiResponse<string[]>>("/api/admin/logs/dates"),
     staleTime: 60 * 1000,
   });
 
