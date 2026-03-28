@@ -55,7 +55,7 @@ func (s *Service) AvailableDates(_ context.Context) ([]string, error) {
 	entries, err := os.ReadDir(s.logsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return []string{}, nil
 		}
 		return nil, fmt.Errorf("logmgmt: read log directory: %w", err)
 	}
