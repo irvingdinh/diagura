@@ -116,7 +116,12 @@ func (h *Handler) Create(w nethttp.ResponseWriter, r *nethttp.Request) {
 
 	role, err := h.userSvc.GetRoleBySlug(r.Context(), input.Role)
 	if err != nil {
-		http.WriteError(w, nethttp.StatusBadRequest, "Invalid role")
+		if errors.Is(err, orm.ErrNotFound) {
+			http.WriteError(w, nethttp.StatusBadRequest, "Invalid role")
+		} else {
+			slog.ErrorContext(r.Context(), "failed to get role", "error", err)
+			http.WriteError(w, nethttp.StatusInternalServerError, "Internal server error")
+		}
 		return
 	}
 
@@ -255,7 +260,12 @@ func (h *Handler) Update(w nethttp.ResponseWriter, r *nethttp.Request) {
 		}
 		role, err := h.userSvc.GetRoleBySlug(r.Context(), *input.Role)
 		if err != nil {
-			http.WriteError(w, nethttp.StatusBadRequest, "Invalid role")
+			if errors.Is(err, orm.ErrNotFound) {
+				http.WriteError(w, nethttp.StatusBadRequest, "Invalid role")
+			} else {
+				slog.ErrorContext(r.Context(), "failed to get role", "error", err)
+				http.WriteError(w, nethttp.StatusInternalServerError, "Internal server error")
+			}
 			return
 		}
 		updateInput.RoleID = &role.ID
