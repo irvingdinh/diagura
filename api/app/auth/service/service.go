@@ -130,7 +130,10 @@ func (s *Service) ValidateSession(ctx context.Context, tokenHash string) (*AuthU
 		&userID, &email, &name, &deletedAt, &forcePasswordChange,
 		&roleSlug,
 	); err != nil {
-		return nil, nil, fmt.Errorf("session not found")
+		if errors.Is(err, sqlite.ErrNoRows) {
+			return nil, nil, fmt.Errorf("session not found")
+		}
+		return nil, nil, fmt.Errorf("query session: %w", err)
 	}
 
 	if deletedAt != nil {

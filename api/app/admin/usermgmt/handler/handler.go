@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"math"
 	nethttp "net/http"
@@ -12,6 +13,7 @@ import (
 	authservice "localhost/app/auth/service"
 	"localhost/app/core/events"
 	"localhost/app/core/http"
+	"localhost/app/core/sqlite/orm"
 	userevent "localhost/app/user/event"
 	userservice "localhost/app/user/service"
 )
@@ -169,7 +171,12 @@ func (h *Handler) Get(w nethttp.ResponseWriter, r *nethttp.Request) {
 
 	user, err := h.userSvc.GetByID(r.Context(), id)
 	if err != nil {
-		http.WriteError(w, nethttp.StatusNotFound, "User not found")
+		if errors.Is(err, orm.ErrNotFound) {
+			http.WriteError(w, nethttp.StatusNotFound, "User not found")
+		} else {
+			slog.ErrorContext(r.Context(), "failed to get user", "error", err)
+			http.WriteError(w, nethttp.StatusInternalServerError, "Internal server error")
+		}
 		return
 	}
 
@@ -189,7 +196,12 @@ func (h *Handler) Update(w nethttp.ResponseWriter, r *nethttp.Request) {
 
 	target, err := h.userSvc.GetByID(r.Context(), id)
 	if err != nil {
-		http.WriteError(w, nethttp.StatusNotFound, "User not found")
+		if errors.Is(err, orm.ErrNotFound) {
+			http.WriteError(w, nethttp.StatusNotFound, "User not found")
+		} else {
+			slog.ErrorContext(r.Context(), "failed to get user", "error", err)
+			http.WriteError(w, nethttp.StatusInternalServerError, "Internal server error")
+		}
 		return
 	}
 
@@ -298,7 +310,12 @@ func (h *Handler) SetPassword(w nethttp.ResponseWriter, r *nethttp.Request) {
 
 	target, err := h.userSvc.GetByID(r.Context(), id)
 	if err != nil {
-		http.WriteError(w, nethttp.StatusNotFound, "User not found")
+		if errors.Is(err, orm.ErrNotFound) {
+			http.WriteError(w, nethttp.StatusNotFound, "User not found")
+		} else {
+			slog.ErrorContext(r.Context(), "failed to get user", "error", err)
+			http.WriteError(w, nethttp.StatusInternalServerError, "Internal server error")
+		}
 		return
 	}
 
@@ -360,7 +377,12 @@ func (h *Handler) Delete(w nethttp.ResponseWriter, r *nethttp.Request) {
 
 	target, err := h.userSvc.GetByID(r.Context(), id)
 	if err != nil {
-		http.WriteError(w, nethttp.StatusNotFound, "User not found")
+		if errors.Is(err, orm.ErrNotFound) {
+			http.WriteError(w, nethttp.StatusNotFound, "User not found")
+		} else {
+			slog.ErrorContext(r.Context(), "failed to get user", "error", err)
+			http.WriteError(w, nethttp.StatusInternalServerError, "Internal server error")
+		}
 		return
 	}
 
@@ -403,7 +425,12 @@ func (h *Handler) Restore(w nethttp.ResponseWriter, r *nethttp.Request) {
 
 	target, err := h.userSvc.GetByID(r.Context(), id)
 	if err != nil {
-		http.WriteError(w, nethttp.StatusNotFound, "User not found")
+		if errors.Is(err, orm.ErrNotFound) {
+			http.WriteError(w, nethttp.StatusNotFound, "User not found")
+		} else {
+			slog.ErrorContext(r.Context(), "failed to get user", "error", err)
+			http.WriteError(w, nethttp.StatusInternalServerError, "Internal server error")
+		}
 		return
 	}
 
